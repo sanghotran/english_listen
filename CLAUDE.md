@@ -171,3 +171,21 @@ If GitNexus results look outdated (missing recently added files/symbols), run `m
 - Do NOT skip `impact()` before modifying a function/component/Rust command that is called from more than one place (this repo's `src-tauri/src/commands/*`, `src/services/*`, and shared `src/store/*`/`src/hooks/*` are the highest-risk shared surfaces).
 - Do NOT reach for `grep`/Explore-agent-only exploration as the first step when GitNexus is available — GitNexus first, grep to confirm/supplement.
 <!-- /gitnexus-instructions -->
+
+<!-- no-build-instructions v1 -->
+# No Build in This Environment (Required)
+
+## Golden Rule
+
+**Never run a full build in this environment** (`cargo build`, `cargo build --release`, `tauri build`, `npm run build`, `pnpm build`, `vite build`, etc.). This sandbox does not have the toolchain needed to build (e.g. Tauri/system deps for Rust). The user builds on their own machine via git after pulling your changes.
+
+## What to use instead
+
+- Rust: `rtk cargo check` / `cargo check`, `rtk cargo clippy` / `cargo clippy` — type/borrow-check and lint without producing build artifacts.
+- Rust tests: `rtk cargo test` / `cargo test` is fine (compiles test binaries, but is not "the build" the user means — only run it if the user asks to run tests; do not run it just to validate a change unless requested).
+- Frontend: `rtk tsc` / `tsc --noEmit` for type-checking, `rtk lint` / lint commands for lint — not `build`/`vite build`/`next build`.
+
+## If a full build seems necessary
+
+If verifying a change genuinely requires a full build (not just check/lint/test), stop and ask the user instead of running it — they will build and verify on their own machine via git.
+<!-- /no-build-instructions -->
