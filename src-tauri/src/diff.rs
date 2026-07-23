@@ -1,6 +1,9 @@
 //! Server-side mirror of `src/utils/diff.ts`. `record_attempt` recomputes accuracy here
 //! instead of trusting whatever number the client sends.
 
+use once_cell::sync::Lazy;
+use regex::Regex;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WordStatus {
     Correct,
@@ -12,6 +15,37 @@ pub enum WordStatus {
 pub struct WordToken {
     pub text: String,
     pub status: WordStatus,
+}
+
+// A few contractions are irregular enough that the generic "stem + n't" rule below would mangle
+// them (e.g. "can't" -> stem "ca" instead of "can", since "can" itself ends in "n").
+static IRREGULAR_CONTRACTIONS: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
+    vec![
+        (Regex::new(r"(?i)\bwon't\b").unwrap(), "will not"),
+        (Regex::new(r"(?i)\bshan't\b").unwrap(), "shall not"),
+        (Regex::new(r"(?i)\bcan't\b").unwrap(), "can not"),
+    ]
+});
+static NT_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(\w+)n't\b").unwrap());
+static RE_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(\w+)'re\b").unwrap());
+static VE_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(\w+)'ve\b").unwrap());
+static LL_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(\w+)'ll\b").unwrap());
+static IM_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\bI'm\b").unwrap());
+
+/// Mirrors `expandContractions()` in src/utils/diff.ts: expands unambiguous contractions to
+/// their full form before tokenizing, so "don't" typed as "do not" (or vice versa) scores as
+/// correct. `'s`/`'d` are genuinely ambiguous (is/has, would/had) and are left alone.
+fn expand_contractions(text: &str) -> String {
+    let mut result = text.to_string();
+    for (pattern, replacement) in IRREGULAR_CONTRACTIONS.iter() {
+        result = pattern.replace_all(&result, *replacement).into_owned();
+    }
+    result = NT_SUFFIX.replace_all(&result, "$1 not").into_owned();
+    result = RE_SUFFIX.replace_all(&result, "$1 are").into_owned();
+    result = VE_SUFFIX.replace_all(&result, "$1 have").into_owned();
+    result = LL_SUFFIX.replace_all(&result, "$1 will").into_owned();
+    result = IM_SUFFIX.replace_all(&result, "I am").into_owned();
+    result
 }
 
 fn tokenize(text: &str) -> Vec<&str> {
@@ -26,8 +60,10 @@ fn normalize(word: &str) -> String {
 /// Word-level diff between what the user typed and the reference transcript, via an
 /// LCS alignment over normalized words (equivalent classification to jsdiff's `diffArrays`).
 pub fn diff_words(input: &str, reference: &str) -> Vec<WordToken> {
-    let ref_tokens = tokenize(reference);
-    let in_tokens = tokenize(input);
+    let expanded_reference = expand_contractions(reference);
+    let expanded_input = expand_contractions(input);
+    let ref_tokens = tokenize(&expanded_reference);
+    let in_tokens = tokenize(&expanded_input);
     let ref_norm: Vec<String> = ref_tokens.iter().map(|w| normalize(w)).collect();
     let in_norm: Vec<String> = in_tokens.iter().map(|w| normalize(w)).collect();
 
@@ -180,5 +216,38 @@ mod tests {
     fn empty_input_is_zero_accuracy() {
         let tokens = diff_words("", "hello world");
         assert_eq!(compute_accuracy(&tokens), 0.0);
+    }
+
+    #[test]
+    fn contraction_typed_out_in_full_is_correct() {
+        let tokens = diff_words("I do not know", "I don't know");
+        assert_eq!(compute_accuracy(&tokens), 1.0);
+    }
+
+    #[test]
+    fn full_form_typed_as_contraction_is_correct() {
+        let tokens = diff_words("I don't know", "I do not know");
+        assert_eq!(compute_accuracy(&tokens), 1.0);
+    }
+
+    #[test]
+    fn irregular_contractions_wont_cant_shant() {
+        assert_eq!(compute_accuracy(&diff_words("will not", "won't")), 1.0);
+        assert_eq!(compute_accuracy(&diff_words("can not", "can't")), 1.0);
+        assert_eq!(compute_accuracy(&diff_words("shall not", "shan't")), 1.0);
+    }
+
+    #[test]
+    fn re_ve_ll_m_contractions() {
+        assert_eq!(compute_accuracy(&diff_words("we are ready", "we're ready")), 1.0);
+        assert_eq!(compute_accuracy(&diff_words("they have left", "they've left")), 1.0);
+        assert_eq!(compute_accuracy(&diff_words("I will go", "I'll go")), 1.0);
+        assert_eq!(compute_accuracy(&diff_words("I am here", "I'm here")), 1.0);
+    }
+
+    #[test]
+    fn still_catches_genuine_mismatch_after_contraction_expansion() {
+        let tokens = diff_words("I don't know", "I do know");
+        assert!(compute_accuracy(&tokens) < 1.0);
     }
 }

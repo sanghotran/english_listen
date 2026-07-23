@@ -1,38 +1,53 @@
 import { create } from "zustand";
+import * as tauriService from "../services/tauri";
 import type { CefrLevel, Lesson } from "../types/lesson";
 
 interface LessonStore {
   lessons: Lesson[];
+  levelFilter: CefrLevel | "ALL";
   isLoading: boolean;
   error: string | null;
+  setLevelFilter: (level: CefrLevel | "ALL") => void;
   loadLessons: () => Promise<void>;
+  refreshFromVoa: () => Promise<number>;
+  ensureAudioDownloaded: (lessonId: string) => Promise<string>;
   getLessonById: (id: string) => Lesson | undefined;
   getLessonsByLevel: (level: CefrLevel | "ALL") => Lesson[];
 }
 
-/**
- * Phase 1: lessons come from a static fixture file (public/fixtures/lessons.json)
- * seeded with real VOA Learning English episodes. Phase 4+ will swap loadLessons()
- * to call services/tauri.ts instead — the public interface stays the same so
- * Home.tsx / Practice.tsx won't need to change.
- */
 export const useLessonStore = create<LessonStore>((set, get) => ({
   lessons: [],
+  levelFilter: "ALL",
   isLoading: false,
   error: null,
+
+  setLevelFilter: (level) => set({ levelFilter: level }),
 
   loadLessons: async () => {
     if (get().lessons.length > 0) return;
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch("/fixtures/lessons.json");
-      if (!res.ok) throw new Error(`Failed to load lessons: ${res.status}`);
-      const lessons: Lesson[] = await res.json();
+      const lessons = await tauriService.listLessons();
       set({ lessons, isLoading: false });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err), isLoading: false });
     }
   },
+
+  refreshFromVoa: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await tauriService.fetchNewLessons();
+      const lessons = await tauriService.listLessons();
+      set({ lessons, isLoading: false });
+      return result.new;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err), isLoading: false });
+      throw err;
+    }
+  },
+
+  ensureAudioDownloaded: (lessonId) => tauriService.ensureAudioUrl(lessonId),
 
   getLessonById: (id) => get().lessons.find((l) => l.id === id),
 

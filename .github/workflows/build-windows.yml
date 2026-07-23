@@ -33,7 +33,15 @@ jobs:
           workspaces: src-tauri
           prefix-key: "rust-native-v1"
 
-      # 4. Build Tauri Desktop App
+      # 4. Run tests before spending time on a full build
+      - name: Run frontend tests (vitest)
+        run: npm run test
+
+      - name: Run backend tests (cargo test)
+        working-directory: src-tauri
+        run: cargo test
+
+      # 5. Build Tauri Desktop App
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -42,7 +50,7 @@ jobs:
           projectPath: "."
           args: "--target x86_64-pc-windows-msvc"
 
-      # 5. Upload packaged Windows installers and standalone executable
+      # 6. Upload packaged Windows installers and standalone executable
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:

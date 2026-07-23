@@ -1,17 +1,13 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
 
 export default function Progress() {
-  const { lessons, loadLessons } = useLessonStore();
-  const { getLevelProgress } = useProgressStore();
+  const { levelProgress, loadLevelProgress } = useProgressStore();
 
   useEffect(() => {
-    loadLessons();
-  }, [loadLessons]);
-
-  const levelProgress = getLevelProgress(lessons);
+    loadLevelProgress();
+  }, [loadLevelProgress]);
 
   return (
     <div className="progress-page">

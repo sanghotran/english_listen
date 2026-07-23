@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AudioPlayer from "../components/AudioPlayer/AudioPlayer";
 import DictationInput from "../components/DictationInput/DictationInput";
@@ -10,14 +10,38 @@ import { useProgressStore } from "../store/progressStore";
 
 export default function Practice() {
   const { lessonId } = useParams<{ lessonId: string }>();
-  const { lessons, loadLessons, getLessonById } = useLessonStore();
-  const { submitAttempt, getAttemptsForLesson } = useProgressStore();
+  const { lessons, loadLessons, getLessonById, ensureAudioDownloaded } = useLessonStore();
+  const { submitAttempt, getAttemptsForLesson, loadAttempts } = useProgressStore();
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   useEffect(() => {
     loadLessons();
   }, [loadLessons]);
 
+  useEffect(() => {
+    if (lessonId) loadAttempts(lessonId);
+  }, [lessonId, loadAttempts]);
+
   const lesson = lessonId ? getLessonById(lessonId) : undefined;
+
+  useEffect(() => {
+    if (!lesson) return;
+    let cancelled = false;
+    setAudioSrc(null);
+    setAudioError(null);
+    ensureAudioDownloaded(lesson.id)
+      .then((src) => {
+        if (!cancelled) setAudioSrc(src);
+      })
+      .catch((err) => {
+        if (!cancelled) setAudioError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson, ensureAudioDownloaded]);
+
   const { input, setInput, result, submit } = useDictationSession(lesson?.transcript ?? "");
 
   if (lessons.length === 0) return <p>Loading lesson...</p>;
@@ -28,7 +52,7 @@ export default function Practice() {
 
   const handleSubmit = () => {
     submit();
-    submitAttempt(lesson.id, input, lesson.transcript);
+    submitAttempt(lesson.id, input);
   };
 
   return (
@@ -36,7 +60,8 @@ export default function Practice() {
       <Link to="/">← Back</Link>
       <h1>{lesson.title}</h1>
       <ProgressTracker level={lesson.level} attemptCount={attempts.length} bestAccuracy={bestAccuracy} />
-      <AudioPlayer src={lesson.audioUrl} />
+      {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
+      {audioSrc ? <AudioPlayer src={audioSrc} /> : !audioError && <p>Downloading audio…</p>}
       <DictationInput value={input} onChange={setInput} onSubmit={handleSubmit} />
       {result && <DiffViewer tokens={result.tokens} accuracy={result.accuracy} />}
     </div>

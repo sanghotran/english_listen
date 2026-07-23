@@ -60,3 +60,37 @@ pub fn extract_episode(html: &str) -> Option<EpisodeContent> {
         transcript: paragraphs.join("\n\n"),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Real VOA episode page ("Researchers: South Korea's Birth Rate..."), fetched by hand on
+    // 2026-07-23 — see docs/PLAN.md Phase 7. The <audio> tag sits deeply nested inside
+    // div.wsw > div.wsw__embed, well before the transcript <p> tags that follow it.
+    const EPISODE_HTML: &str = include_str!("../../tests/fixtures/episode_south_korea_birth_rate.html");
+
+    #[test]
+    fn extracts_audio_and_transcript_from_real_episode_page() {
+        let episode =
+            extract_episode(EPISODE_HTML).expect("real episode page should have audio+transcript");
+        assert!(episode.audio_url.contains("e4a0af84-7057-4f35-9015-08dd5b02d8d7.mp3"));
+        assert!(episode
+            .transcript
+            .starts_with("In 2024, the number of babies born in South Korea"));
+        assert!(episode.transcript.contains("238,300 babies were born last year"));
+        // The glossary section after the h2 boundary must be excluded.
+        assert!(!episode.transcript.contains("Words in This Story"));
+    }
+
+    #[test]
+    fn returns_none_when_audio_or_transcript_missing() {
+        assert!(extract_episode("<html><body><p>no audio or wsw here</p></body></html>").is_none());
+    }
+
+    #[test]
+    fn returns_none_when_wsw_has_no_paragraphs() {
+        let html = r#"<html><body><audio src="https://example.com/a.mp3"></audio><div class="wsw"><h2>Words in This Story</h2></div></body></html>"#;
+        assert!(extract_episode(html).is_none());
+    }
+}

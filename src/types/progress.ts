@@ -1,7 +1,7 @@
 import type { CefrLevel } from "./lesson";
 
 export interface Attempt {
-  id: string;
+  id: number;
   lessonId: string;
   accuracy: number;
   attemptedAt: string;

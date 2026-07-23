@@ -73,4 +73,34 @@ describe("diffWords", () => {
     const tokens = diffWords("hello", "");
     expect(computeAccuracy(tokens)).toBe(0);
   });
+
+  describe("contractions", () => {
+    it("treats a contraction typed out in full as correct", () => {
+      const tokens = diffWords("I do not know", "I don't know");
+      expect(computeAccuracy(tokens)).toBe(1);
+    });
+
+    it("treats a full form typed as a contraction as correct", () => {
+      const tokens = diffWords("I don't know", "I do not know");
+      expect(computeAccuracy(tokens)).toBe(1);
+    });
+
+    it("handles the irregular contractions won't/can't/shan't", () => {
+      expect(computeAccuracy(diffWords("will not", "won't"))).toBe(1);
+      expect(computeAccuracy(diffWords("can not", "can't"))).toBe(1);
+      expect(computeAccuracy(diffWords("shall not", "shan't"))).toBe(1);
+    });
+
+    it("handles 're/'ve/'ll/'m contractions", () => {
+      expect(computeAccuracy(diffWords("we are ready", "we're ready"))).toBe(1);
+      expect(computeAccuracy(diffWords("they have left", "they've left"))).toBe(1);
+      expect(computeAccuracy(diffWords("I will go", "I'll go"))).toBe(1);
+      expect(computeAccuracy(diffWords("I am here", "I'm here"))).toBe(1);
+    });
+
+    it("still catches a genuine mismatch after contraction expansion", () => {
+      const tokens = diffWords("I don't know", "I do know");
+      expect(computeAccuracy(tokens)).toBeLessThan(1);
+    });
+  });
 });

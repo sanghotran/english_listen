@@ -7,8 +7,34 @@ export interface WordDiffToken {
   status: WordDiffStatus;
 }
 
+// A few contractions are irregular enough that the generic "stem + n't" rule below would mangle
+// them (e.g. "can't" -> stem "ca" instead of "can", since "can" itself ends in "n").
+const IRREGULAR_CONTRACTIONS: Array<[RegExp, string]> = [
+  [/\bwon't\b/gi, "will not"],
+  [/\bshan't\b/gi, "shall not"],
+  [/\bcan't\b/gi, "can not"],
+];
+
+/**
+ * Expands unambiguous contractions to their full form before tokenizing, so "don't" typed as
+ * "do not" (or vice versa) scores as correct — VOA transcripts use contractions, but a learner
+ * may type either form. `'s`/`'d` are genuinely ambiguous (is/has, would/had) and are left alone.
+ */
+function expandContractions(text: string): string {
+  let result = text;
+  for (const [pattern, replacement] of IRREGULAR_CONTRACTIONS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result
+    .replace(/\b(\w+)n't\b/gi, "$1 not")
+    .replace(/\b(\w+)'re\b/gi, "$1 are")
+    .replace(/\b(\w+)'ve\b/gi, "$1 have")
+    .replace(/\b(\w+)'ll\b/gi, "$1 will")
+    .replace(/\bI'm\b/gi, "I am");
+}
+
 function tokenize(text: string): string[] {
-  return text.trim().split(/\s+/).filter(Boolean);
+  return expandContractions(text).trim().split(/\s+/).filter(Boolean);
 }
 
 function normalize(word: string): string {

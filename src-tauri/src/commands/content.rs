@@ -66,8 +66,8 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
             let is_new = !existing_guids.contains(&item.guid);
 
             sqlx::query(
-                "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count, page_url)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(guid) DO UPDATE SET
                     title = excluded.title,
                     level = excluded.level,
@@ -75,7 +75,8 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
                     transcript = excluded.transcript,
                     published_at = excluded.published_at,
                     source_show = excluded.source_show,
-                    word_count = excluded.word_count",
+                    word_count = excluded.word_count,
+                    page_url = excluded.page_url",
             )
             .bind(&item.guid)
             .bind(&item.title)
@@ -86,6 +87,7 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
             .bind(&item.guid)
             .bind(feed.show)
             .bind(word_count)
+            .bind(&item.link)
             .execute(pool.inner())
             .await?;
 
@@ -154,8 +156,8 @@ pub async fn get_level_progress(
 ) -> Result<Vec<LevelProgress>, AppError> {
     let progress = sqlx::query_as::<_, LevelProgress>(
         "SELECT l.level AS level,
-                COUNT(DISTINCT a.lesson_id) AS lessons_attempted,
-                COALESCE(AVG(a.accuracy), 0.0) AS avg_accuracy
+                COUNT(DISTINCT a.lesson_id) AS lessons_completed,
+                COALESCE(AVG(a.accuracy), 0.0) AS average_accuracy
          FROM lessons l
          LEFT JOIN attempts a ON a.lesson_id = l.id
          GROUP BY l.level

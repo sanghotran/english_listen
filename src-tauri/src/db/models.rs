@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct Lesson {
     pub id: String,
     pub title: String,
@@ -12,9 +13,11 @@ pub struct Lesson {
     pub guid: String,
     pub source_show: String,
     pub word_count: i64,
+    pub page_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct Attempt {
     pub id: i64,
     pub lesson_id: String,
@@ -27,9 +30,12 @@ pub struct Attempt {
 }
 
 /// Not a table — computed on the fly via GROUP BY over `attempts` joined with `lessons`.
+/// Field names/semantics match the frontend's `LevelProgress` type (src/types/progress.ts):
+/// a lesson counts as "completed" once it has at least one recorded attempt.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct LevelProgress {
     pub level: String,
-    pub lessons_attempted: i64,
-    pub avg_accuracy: f64,
+    pub lessons_completed: i64,
+    pub average_accuracy: f64,
 }
