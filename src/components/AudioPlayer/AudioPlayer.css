@@ -1,0 +1,26 @@
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+}
+
+.audio-player__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.audio-player__timeline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.audio-player__timeline input[type="range"] {
+  flex: 1;
+}

@@ -1,11 +1,14 @@
+import type { CefrLevel } from "./lesson";
+
 export interface Attempt {
+  id: string;
   lessonId: string;
   accuracy: number;
   attemptedAt: string;
 }
 
 export interface LevelProgress {
-  level: "A1" | "A2" | "B1";
+  level: CefrLevel;
   lessonsCompleted: number;
   averageAccuracy: number;
 }

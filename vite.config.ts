@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // Tauri expects a fixed port and relative asset paths
@@ -13,5 +13,8 @@ export default defineConfig({
   build: {
     target: ["es2021", "chrome100", "safari13"],
     outDir: "dist",
+  },
+  test: {
+    setupFiles: ["./src/setupTests.ts"],
   },
 });

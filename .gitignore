@@ -1,0 +1,28 @@
+# Frontend
+node_modules
+dist
+dist-ssr
+*.local
+
+# Tauri / Rust
+src-tauri/target
+src-tauri/Cargo.lock
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+audio_cache/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+.rtk
+

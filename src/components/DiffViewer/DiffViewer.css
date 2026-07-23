@@ -1,0 +1,37 @@
+.diff-viewer {
+  padding: 0.75rem 1rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+}
+
+.diff-viewer__score {
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.diff-viewer__tokens {
+  line-height: 1.8;
+}
+
+.diff-token--correct {
+  color: #1a7f37;
+}
+
+.diff-token--missing {
+  color: #b35900;
+  text-decoration: underline wavy;
+}
+
+.diff-token--extra {
+  color: #cf222e;
+  text-decoration: line-through;
+}
+
+.diff-viewer__legend {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
