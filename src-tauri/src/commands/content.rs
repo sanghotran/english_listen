@@ -31,11 +31,71 @@ pub struct FetchResult {
     pub new: u32,
 }
 
-/// Real VOA ingestion lands in Phase 4 (RSS + transcript scraping). Until then this keeps
-/// the IPC contract stable so the frontend can wire the "refresh" action end-to-end now.
+/// Pulls the 4 confirmed VOA show feeds, opens each episode page for audio+transcript, and
+/// upserts by `guid` — re-running this is naturally idempotent (a second run reports `new: 0`
+/// once nothing has changed upstream), so no separate "last seen" bookkeeping is needed.
 #[tauri::command]
-pub async fn fetch_new_lessons(_pool: State<'_, SqlitePool>) -> Result<FetchResult, AppError> {
-    Ok(FetchResult { new: 0 })
+pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResult, AppError> {
+    let client = reqwest::Client::new();
+
+    let existing_guids: std::collections::HashSet<String> =
+        sqlx::query_scalar("SELECT guid FROM lessons")
+            .fetch_all(pool.inner())
+            .await?
+            .into_iter()
+            .collect();
+
+    let mut new_count: u32 = 0;
+
+    for feed in crate::scraper::feeds::FEEDS {
+        let items = match crate::scraper::voa_rss::fetch_feed(&client, &feed.url()).await {
+            Ok(items) => items,
+            // One unreachable feed shouldn't abort the whole refresh.
+            Err(_) => continue,
+        };
+
+        for item in items {
+            let episode = match crate::scraper::transcript::fetch_episode(&client, &item.link).await {
+                Ok(Some(episode)) => episode,
+                // Missing audio/transcript (video-only, audio-only items) or a fetch failure:
+                // skip, not an error — see docs/PLAN.md Phase 4.
+                Ok(None) | Err(_) => continue,
+            };
+
+            let word_count = episode.transcript.split_whitespace().count() as i64;
+            let is_new = !existing_guids.contains(&item.guid);
+
+            sqlx::query(
+                "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(guid) DO UPDATE SET
+                    title = excluded.title,
+                    level = excluded.level,
+                    audio_url = excluded.audio_url,
+                    transcript = excluded.transcript,
+                    published_at = excluded.published_at,
+                    source_show = excluded.source_show,
+                    word_count = excluded.word_count",
+            )
+            .bind(&item.guid)
+            .bind(&item.title)
+            .bind(feed.level)
+            .bind(&episode.audio_url)
+            .bind(&episode.transcript)
+            .bind(&item.pub_date)
+            .bind(&item.guid)
+            .bind(feed.show)
+            .bind(word_count)
+            .execute(pool.inner())
+            .await?;
+
+            if is_new {
+                new_count += 1;
+            }
+        }
+    }
+
+    Ok(FetchResult { new: new_count })
 }
 
 #[tauri::command]

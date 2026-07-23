@@ -37,3 +37,9 @@ impl From<reqwest::Error> for AppError {
         AppError::Network(err.to_string())
     }
 }
+
+impl From<std::io::Error> for AppError {
+    fn from(err: std::io::Error) -> Self {
+        AppError::Database(err.to_string())
+    }
+}

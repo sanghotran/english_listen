@@ -1,19 +1,53 @@
 use crate::error::AppError;
+use crate::scraper::CHROME_USER_AGENT;
+use futures_util::StreamExt;
 use sqlx::SqlitePool;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
+use tokio::io::AsyncWriteExt;
 
-/// Real HTTP streaming to `{app_data_dir}/audio/{lesson_id}.mp3` lands in Phase 4. For now
-/// this validates the lesson exists so the command's NotFound path is already exercised.
+/// Streams the lesson's mp3 to `{app_data_dir}/audio/{lesson_id}.mp3` and records the local
+/// path — the frontend never opens the VOA URL directly in the webview (see `get_lesson_audio_path`).
 #[tauri::command]
 pub async fn download_audio(
+    app: AppHandle,
     pool: State<'_, SqlitePool>,
     lesson_id: String,
 ) -> Result<(), AppError> {
-    let exists: Option<(String,)> = sqlx::query_as("SELECT id FROM lessons WHERE id = ?")
+    let audio_url: Option<(String,)> = sqlx::query_as("SELECT audio_url FROM lessons WHERE id = ?")
         .bind(&lesson_id)
         .fetch_optional(pool.inner())
         .await?;
-    exists.ok_or_else(|| AppError::NotFound(format!("lesson '{lesson_id}' not found")))?;
+    let (audio_url,) =
+        audio_url.ok_or_else(|| AppError::NotFound(format!("lesson '{lesson_id}' not found")))?;
+
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let audio_dir = data_dir.join("audio");
+    tokio::fs::create_dir_all(&audio_dir).await?;
+    let file_path = audio_dir.join(format!("{lesson_id}.mp3"));
+
+    let response = reqwest::Client::new()
+        .get(&audio_url)
+        .header("User-Agent", CHROME_USER_AGENT)
+        .send()
+        .await?
+        .error_for_status()?;
+
+    let mut file = tokio::fs::File::create(&file_path).await?;
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        file.write_all(&chunk?).await?;
+    }
+
+    let path_str = file_path.to_string_lossy().to_string();
+    sqlx::query("UPDATE lessons SET local_audio_path = ? WHERE id = ?")
+        .bind(&path_str)
+        .bind(&lesson_id)
+        .execute(pool.inner())
+        .await?;
+
     Ok(())
 }
 
