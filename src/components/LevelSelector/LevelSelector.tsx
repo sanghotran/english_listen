@@ -1,4 +1,5 @@
 import type { CefrLevel } from "../../types/lesson";
+import "./LevelSelector.css";
 
 export type LevelFilter = CefrLevel | "ALL";
 

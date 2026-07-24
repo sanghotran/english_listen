@@ -1,37 +1,67 @@
 .diff-viewer {
-  padding: 0.75rem 1rem;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 18px;
+  background: var(--paper-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .diff-viewer__score {
-  font-weight: 600;
-  margin: 0 0 0.5rem;
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--success);
+  background: var(--success-wash);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin: 0 0 12px;
 }
 
 .diff-viewer__tokens {
-  line-height: 1.8;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.9;
+  margin: 0 0 14px;
+  color: var(--ink);
 }
 
 .diff-token--correct {
-  color: #1a7f37;
+  color: var(--ink);
 }
 
 .diff-token--missing {
-  color: #b35900;
-  text-decoration: underline wavy;
+  color: var(--accent-strong);
+  text-decoration: underline wavy var(--accent);
+  text-decoration-thickness: 1px;
 }
 
 .diff-token--extra {
-  color: #cf222e;
+  color: var(--error);
   text-decoration: line-through;
+  opacity: 0.75;
 }
 
 .diff-viewer__legend {
   display: flex;
-  gap: 1rem;
+  gap: 16px;
+  flex-wrap: wrap;
   list-style: none;
   padding: 0;
-  margin: 0.5rem 0 0;
-  font-size: 0.8rem;
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.diff-viewer__legend li::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 6px;
 }

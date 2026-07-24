@@ -1,0 +1,30 @@
+.dictation-input {
+  margin-bottom: 18px;
+}
+
+.dictation-input textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.dictation-input__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dictation-input__hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}

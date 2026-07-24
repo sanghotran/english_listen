@@ -1,0 +1,33 @@
+.level-selector {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--paper-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.level-selector__btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  background: none;
+  color: var(--ink-muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.level-selector__btn.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+@media (prefers-color-scheme: dark) {
+  .level-selector__btn.is-active {
+    background: var(--accent);
+    color: #1a1305;
+  }
+}

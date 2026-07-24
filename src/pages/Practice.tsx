@@ -7,6 +7,7 @@ import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
+import "./Practice.css";
 
 export default function Practice() {
   const { lessonId } = useParams<{ lessonId: string }>();
@@ -57,11 +58,13 @@ export default function Practice() {
 
   return (
     <div className="practice-page">
-      <Link to="/">← Back</Link>
+      <Link to="/" className="practice-page__back">
+        ← Back
+      </Link>
       <h1>{lesson.title}</h1>
       <ProgressTracker level={lesson.level} attemptCount={attempts.length} bestAccuracy={bestAccuracy} />
       {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
-      {audioSrc ? <AudioPlayer src={audioSrc} /> : !audioError && <p>Downloading audio…</p>}
+      {audioSrc ? <AudioPlayer src={audioSrc} /> : !audioError && <p className="practice-page__status">Downloading audio…</p>}
       <DictationInput value={input} onChange={setInput} onSubmit={handleSubmit} />
       {result && <DiffViewer tokens={result.tokens} accuracy={result.accuracy} />}
     </div>

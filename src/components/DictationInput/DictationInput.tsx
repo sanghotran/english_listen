@@ -1,3 +1,5 @@
+import "./DictationInput.css";
+
 interface DictationInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -7,7 +9,7 @@ interface DictationInputProps {
 
 export default function DictationInput({ value, onChange, onSubmit, disabled }: DictationInputProps) {
   return (
-    <div className="dictation-input">
+    <div className="dictation-input card">
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -18,12 +20,22 @@ export default function DictationInput({ value, onChange, onSubmit, disabled }: 
           }
         }}
         disabled={disabled}
-        placeholder="Type what you hear... (Ctrl/Cmd+Enter to check)"
+        placeholder="Type what you hear..."
         rows={4}
       />
-      <button type="button" onClick={onSubmit} disabled={disabled || value.trim().length === 0}>
-        Check
-      </button>
+      <div className="dictation-input__foot">
+        <span className="dictation-input__hint">
+          <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Enter</kbd> to check
+        </span>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onSubmit}
+          disabled={disabled || value.trim().length === 0}
+        >
+          Check
+        </button>
+      </div>
     </div>
   );
 }
