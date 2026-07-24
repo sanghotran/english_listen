@@ -40,8 +40,8 @@ export async function ensureAudioUrl(lessonId: string): Promise<string> {
   return convertFileSrc(localPath);
 }
 
-export function recordAttempt(lessonId: string, userTranscript: string): Promise<Attempt> {
-  return invoke("record_attempt", { lessonId, userTranscript });
+export function recordAttempt(lessonId: string, segmentIndex: number, userTranscript: string): Promise<Attempt> {
+  return invoke("record_attempt", { lessonId, segmentIndex, userTranscript });
 }
 
 export function listAttempts(lessonId: string): Promise<Attempt[]> {

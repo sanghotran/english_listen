@@ -4,6 +4,7 @@ mod diff;
 mod error;
 mod logging;
 mod scraper;
+mod segments;
 
 use tauri::Manager;
 

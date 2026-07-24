@@ -31,6 +31,7 @@ vi.mock("@tauri-apps/api/core", () => ({
         return {
           id: 1,
           lessonId: args?.lessonId,
+          segmentIndex: args?.segmentIndex,
           accuracy: 0.67,
           attemptedAt: "2026-01-01T00:00:00Z",
         };

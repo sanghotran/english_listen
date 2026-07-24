@@ -21,6 +21,7 @@ pub struct Lesson {
 pub struct Attempt {
     pub id: i64,
     pub lesson_id: String,
+    pub segment_index: i64,
     pub accuracy: f64,
     pub attempted_at: String,
     pub user_transcript: String,

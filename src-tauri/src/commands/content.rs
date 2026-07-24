@@ -111,11 +111,19 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
 pub async fn record_attempt(
     pool: State<'_, SqlitePool>,
     lesson_id: String,
+    segment_index: i64,
     user_transcript: String,
 ) -> Result<Attempt, AppError> {
     let lesson = fetch_lesson(pool.inner(), &lesson_id).await?;
 
-    let tokens = diff::diff_words(&user_transcript, &lesson.transcript);
+    // Recomputed server-side from the lesson transcript + level, same as the whole-transcript
+    // scoring below it replaced — never trust a reference text the client could send directly.
+    let segment_reference = crate::segments::segment_transcript(&lesson.transcript, &lesson.level)
+        .into_iter()
+        .nth(segment_index as usize)
+        .ok_or_else(|| AppError::NotFound(format!("segment {segment_index} out of range")))?;
+
+    let tokens = diff::diff_words(&user_transcript, &segment_reference);
     let accuracy = diff::compute_accuracy(&tokens);
     let correct_count = tokens.iter().filter(|t| t.status == WordStatus::Correct).count() as i64;
     let missing_count = tokens.iter().filter(|t| t.status == WordStatus::Missing).count() as i64;
@@ -124,11 +132,12 @@ pub async fn record_attempt(
 
     let attempt = sqlx::query_as::<_, Attempt>(
         "INSERT INTO attempts
-            (lesson_id, accuracy, attempted_at, user_transcript, correct_count, missing_count, extra_count)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+            (lesson_id, segment_index, accuracy, attempted_at, user_transcript, correct_count, missing_count, extra_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING *",
     )
     .bind(&lesson_id)
+    .bind(segment_index)
     .bind(accuracy)
     .bind(&attempted_at)
     .bind(&user_transcript)

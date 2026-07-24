@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AudioPlayer from "../components/AudioPlayer/AudioPlayer";
 import DictationInput from "../components/DictationInput/DictationInput";
@@ -8,6 +8,7 @@ import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
 import { errorMessage } from "../utils/error";
+import { segmentTranscript } from "../utils/segments";
 import "./Practice.css";
 
 export default function Practice() {
@@ -16,9 +17,10 @@ export default function Practice() {
   // route and we decode back here — the raw URL contains slashes that break route matching.
   const lessonId = rawLessonId ? decodeURIComponent(rawLessonId) : undefined;
   const { lessons, loadLessons, getLessonById, ensureAudioDownloaded } = useLessonStore();
-  const { submitAttempt, getAttemptsForLesson, loadAttempts } = useProgressStore();
+  const { submitAttempt, getAttemptsForLesson, getAttemptsForSegment, loadAttempts } = useProgressStore();
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [segmentIndex, setSegmentIndex] = useState(0);
 
   useEffect(() => {
     loadLessons();
@@ -29,6 +31,14 @@ export default function Practice() {
   }, [lessonId, loadAttempts]);
 
   const lesson = lessonId ? getLessonById(lessonId) : undefined;
+
+  // A full ~5 minute transcript is too much to dictate in one pass, so it's split into a few
+  // sentences at a time (more per segment at higher levels — see utils/segments.ts).
+  const segments = useMemo(() => (lesson ? segmentTranscript(lesson.transcript, lesson.level) : []), [lesson]);
+
+  useEffect(() => {
+    setSegmentIndex(0);
+  }, [lesson?.id]);
 
   useEffect(() => {
     if (!lesson) return;
@@ -48,17 +58,23 @@ export default function Practice() {
     };
   }, [lesson, ensureAudioDownloaded]);
 
-  const { input, setInput, result, submit } = useDictationSession(lesson?.transcript ?? "");
+  const { input, setInput, result, submit, reset } = useDictationSession(segments[segmentIndex] ?? "");
+
+  useEffect(() => {
+    reset();
+  }, [lesson?.id, segmentIndex, reset]);
 
   if (lessons.length === 0) return <p>Loading lesson...</p>;
   if (!lesson) return <p role="alert">Lesson not found. <Link to="/">Back to lessons</Link></p>;
 
-  const attempts = getAttemptsForLesson(lesson.id);
-  const bestAccuracy = attempts.length > 0 ? Math.max(...attempts.map((a) => a.accuracy)) : null;
+  const lessonAttempts = getAttemptsForLesson(lesson.id);
+  const segmentAttempts = getAttemptsForSegment(lesson.id, segmentIndex);
+  const bestAccuracy = segmentAttempts.length > 0 ? Math.max(...segmentAttempts.map((a) => a.accuracy)) : null;
+  const attemptedSegments = new Set(lessonAttempts.map((a) => a.segmentIndex));
 
   const handleSubmit = () => {
     submit();
-    submitAttempt(lesson.id, input);
+    submitAttempt(lesson.id, segmentIndex, input);
   };
 
   return (
@@ -67,9 +83,46 @@ export default function Practice() {
         ← Back
       </Link>
       <h1>{lesson.title}</h1>
-      <ProgressTracker level={lesson.level} attemptCount={attempts.length} bestAccuracy={bestAccuracy} />
+      <ProgressTracker level={lesson.level} attemptCount={segmentAttempts.length} bestAccuracy={bestAccuracy} />
       {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
       {audioSrc ? <AudioPlayer src={audioSrc} /> : !audioError && <p className="practice-page__status">Downloading audio…</p>}
+
+      <div className="segment-nav">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setSegmentIndex((i) => i - 1)}
+          disabled={segmentIndex === 0}
+        >
+          ← Prev
+        </button>
+        <div className="segment-nav__dots">
+          {segments.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`segment-nav__dot ${i === segmentIndex ? "segment-nav__dot--active" : ""} ${
+                attemptedSegments.has(i) ? "segment-nav__dot--done" : ""
+              }`}
+              onClick={() => setSegmentIndex(i)}
+              aria-label={`Segment ${i + 1} of ${segments.length}`}
+              aria-current={i === segmentIndex}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setSegmentIndex((i) => i + 1)}
+          disabled={segmentIndex >= segments.length - 1}
+        >
+          Next →
+        </button>
+      </div>
+      <p className="segment-nav__label">
+        Segment {segmentIndex + 1} / {segments.length}
+      </p>
+
       <DictationInput value={input} onChange={setInput} onSubmit={handleSubmit} />
       {result && <DiffViewer tokens={result.tokens} accuracy={result.accuracy} />}
     </div>

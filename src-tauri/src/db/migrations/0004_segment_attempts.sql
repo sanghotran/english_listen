@@ -1,0 +1,1 @@
+ALTER TABLE attempts ADD COLUMN segment_index INTEGER NOT NULL DEFAULT 0;
