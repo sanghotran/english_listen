@@ -14,6 +14,35 @@
   color: var(--ink);
 }
 
+.progress-page__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-page__title h1 {
+  margin-bottom: 0;
+}
+
+.progress-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 18px 20px;
+  background: var(--paper-raised);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+
+.progress-empty p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-weight: 700;
+  font-size: 14px;
+}
+
 .progress-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -26,9 +55,10 @@
   align-items: center;
   gap: 16px;
   background: var(--paper-raised);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 18px;
+  box-shadow: var(--shadow-soft);
 }
 
 .ring {
@@ -53,16 +83,15 @@
 
 .ring span {
   position: relative;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: 600;
+  font-size: 13.5px;
 }
 
 .level-card__label {
-  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.05em;
   color: var(--ink-muted);
   margin: 0 0 4px;
@@ -70,6 +99,7 @@
 
 .level-card__count {
   font-size: 13px;
+  font-weight: 700;
   color: var(--ink-muted);
   margin: 0;
 }

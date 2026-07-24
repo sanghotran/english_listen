@@ -38,23 +38,31 @@ export default function AudioPlayer({ src, bounds }: AudioPlayerProps) {
     <div className="audio-player">
       <audio ref={audioRef} src={src} preload="metadata" />
       <div className="audio-player__controls">
-        <button type="button" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
+        <button
+          type="button"
+          className="audio-player__toggle"
+          onClick={toggle}
+          aria-label={isPlaying ? "Pause" : "Play"}
+        >
           {isPlaying ? "⏸" : "▶"}
         </button>
-        <button type="button" onClick={replayFromStart} aria-label="Replay segment">
-          ⏮ Replay
-        </button>
-        <select
-          value={playbackRate}
-          onChange={(e) => setPlaybackRate(Number(e.target.value))}
-          aria-label="Playback speed"
-        >
-          {RATES.map((rate) => (
-            <option key={rate} value={rate}>
-              {rate}x
-            </option>
-          ))}
-        </select>
+        <div className="audio-player__secondary">
+          <button type="button" className="audio-player__replay" onClick={replayFromStart} aria-label="Replay segment">
+            ⏮ Replay
+          </button>
+          <select
+            className="audio-player__rate"
+            value={playbackRate}
+            onChange={(e) => setPlaybackRate(Number(e.target.value))}
+            aria-label="Playback speed"
+          >
+            {RATES.map((rate) => (
+              <option key={rate} value={rate}>
+                {rate}x
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="audio-player__timeline">
         <span>{formatTime(elapsed)}</span>

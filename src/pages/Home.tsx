@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import LevelSelector from "../components/LevelSelector/LevelSelector";
+import { MascotBunny } from "../components/Mascot/Mascot";
 import { useLessonStore } from "../store/lessonStore";
 import type { CefrLevel } from "../types/lesson";
 import "./Home.css";
@@ -10,6 +11,22 @@ const LEVEL_CLASS: Record<CefrLevel, string> = {
   A2: "level-pill--a2",
   B1: "level-pill--b1",
 };
+
+const LEVEL_CARD_CLASS: Record<CefrLevel, string> = {
+  A1: "lesson-card--a1",
+  A2: "lesson-card--a2",
+  B1: "lesson-card--b1",
+};
+
+function HeadphoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+      <path d="M4 15v-3a8 8 0 0116 0v3" />
+      <path d="M4 15a2 2 0 002 2h1v-6H6a2 2 0 00-2 2z" />
+      <path d="M20 15a2 2 0 01-2 2h-1v-6h1a2 2 0 012 2z" />
+    </svg>
+  );
+}
 
 export default function Home() {
   const {
@@ -48,7 +65,10 @@ export default function Home() {
   return (
     <div className="home-page">
       <div className="home-page__head">
-        <h1>English Listen</h1>
+        <div className="home-page__title">
+          <MascotBunny size={44} />
+          <h1>English Listen</h1>
+        </div>
         <button type="button" className="btn" onClick={handleRefresh} disabled={isRefreshing}>
           {isRefreshing && <span className="spinner" aria-hidden="true" />}
           {isRefreshing ? "Refreshing…" : "Refresh lessons"}
@@ -68,19 +88,31 @@ export default function Home() {
           </p>
         </div>
       )}
-      <LevelSelector value={levelFilter} onChange={setLevelFilter} />
+      <div className="home-page__tabs-row">
+        <LevelSelector value={levelFilter} onChange={setLevelFilter} />
+        <Link to="/progress" className="progress-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 20V14M12 20V8M20 20V4" />
+          </svg>
+          Progress
+        </Link>
+      </div>
       <div className="lesson-grid">
         {visibleLessons.map((lesson) => (
-          <Link key={lesson.id} to={`/practice/${lesson.id}`} className="lesson-card">
-            <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
+          <Link
+            key={lesson.id}
+            to={`/practice/${lesson.id}`}
+            className={`lesson-card ${LEVEL_CARD_CLASS[lesson.level]}`}
+          >
+            <span className="lesson-icon">
+              <HeadphoneIcon />
+            </span>
             <h3>{lesson.title}</h3>
             <p className="lesson-card__meta">{lesson.category}</p>
+            <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
           </Link>
         ))}
       </div>
-      <Link to="/progress" className="home-page__progress-link">
-        View progress
-      </Link>
     </div>
   );
 }

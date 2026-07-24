@@ -1,14 +1,15 @@
 import { useEffect } from "react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
+import { MascotBear, MascotBunny } from "../components/Mascot/Mascot";
 import { useProgressStore } from "../store/progressStore";
 import type { CefrLevel } from "../types/lesson";
 import "./Progress.css";
 
 const RING_COLOR: Record<CefrLevel, string> = {
-  A1: "var(--teal)",
-  A2: "var(--accent)",
-  B1: "var(--indigo)",
+  A1: "var(--matcha)",
+  A2: "var(--yolk)",
+  B1: "var(--taro)",
 };
 
 export default function Progress() {
@@ -23,9 +24,15 @@ export default function Progress() {
       <Link to="/" className="progress-page__back">
         ← Back
       </Link>
-      <h1>Progress</h1>
+      <div className="progress-page__title">
+        <MascotBunny size={40} />
+        <h1>Progress</h1>
+      </div>
       {levelProgress.length === 0 ? (
-        <p>No attempts yet — go practice a lesson first.</p>
+        <div className="progress-empty">
+          <MascotBear size={56} />
+          <p>No attempts yet — go practice a lesson first.</p>
+        </div>
       ) : (
         <div className="progress-grid">
           {levelProgress.map((lp) => {

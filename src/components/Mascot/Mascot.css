@@ -1,0 +1,83 @@
+.mascot {
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.mascot-highlight {
+  fill: #fff;
+  opacity: 0.55;
+}
+
+.mascot-blush {
+  fill: var(--brand);
+  opacity: 0.5;
+}
+
+.mascot-mouth {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+/* Bunny */
+.mascot-body {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+
+.mascot-ear {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+
+.mascot-ear-inner {
+  fill: var(--brand-wash);
+}
+
+.mascot-eye {
+  fill: var(--ink);
+}
+
+.mascot-bow,
+.mascot-bow-knot {
+  fill: var(--brand);
+  stroke: var(--brand-strong);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+/* Bear */
+.bear-ear {
+  fill: var(--yolk);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+
+.bear-body {
+  fill: var(--yolk-wash);
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+
+.bear-eye {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.bear-nose {
+  fill: var(--ink);
+}
+
+.bear-bow,
+.bear-bow-knot {
+  fill: var(--taro);
+  stroke: var(--taro-strong);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}

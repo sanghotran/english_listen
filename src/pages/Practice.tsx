@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import AudioPlayer from "../components/AudioPlayer/AudioPlayer";
 import DictationInput from "../components/DictationInput/DictationInput";
 import DiffViewer from "../components/DiffViewer/DiffViewer";
+import { MascotBunny } from "../components/Mascot/Mascot";
 import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
@@ -82,7 +83,10 @@ export default function Practice() {
       <Link to="/" className="practice-page__back">
         ← Back
       </Link>
-      <h1>{lesson.title}</h1>
+      <div className="practice-page__title">
+        <MascotBunny size={36} />
+        <h1>{lesson.title}</h1>
+      </div>
       <ProgressTracker level={lesson.level} attemptCount={segmentAttempts.length} bestAccuracy={bestAccuracy} />
       {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
       {audioSrc && segment ? (

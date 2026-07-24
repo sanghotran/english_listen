@@ -4,17 +4,23 @@
 
 .dictation-input textarea {
   width: 100%;
-  min-height: 72px;
+  min-height: 76px;
   resize: vertical;
-  font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--ink);
   background: var(--paper);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.dictation-input textarea::placeholder {
+  color: var(--ink-faint);
+  font-weight: 600;
 }
 
 .dictation-input__foot {

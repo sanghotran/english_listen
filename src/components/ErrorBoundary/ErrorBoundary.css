@@ -9,7 +9,7 @@
 .error-boundary h1 {
   font-family: var(--font-display);
   font-size: 20px;
-  color: var(--error);
+  color: var(--miss-strong);
   margin: 0 0 10px;
 }
 
@@ -19,7 +19,7 @@
 }
 
 .error-boundary__hint {
-  font-family: var(--font-mono);
   font-size: 12px;
+  font-weight: 700;
   color: var(--ink-faint);
 }

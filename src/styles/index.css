@@ -1,30 +1,64 @@
+@font-face {
+  font-family: "Fredoka";
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/fredoka-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/nunito-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/nunito-italic-variable.woff2") format("woff2");
+}
+
 :root {
-  --bg: #E7E9E2;
-  --paper: #F6F6F1;
-  --paper-raised: #FFFFFE;
-  --ink: #1D2420;
-  --ink-muted: #616B63;
-  --ink-faint: #8A9289;
-  --border: #D7D9CF;
+  --bg: #FFF6EF;
+  --paper: #FFFFFF;
+  --paper-raised: #FFFBF7;
+  --ink: #4A3339;
+  --ink-muted: #93737C;
+  --ink-faint: #C7AEB5;
+  --border: #F4DEE2;
 
-  --accent: #C07C33;
-  --accent-strong: #8C5620;
-  --accent-wash: #F1E1CC;
-  --teal: #2E6B66;
-  --teal-wash: #DDEAE7;
-  --indigo: #3E5A78;
-  --indigo-wash: #DEE5EC;
-  --success: #3F8855;
-  --success-wash: #DFEEE2;
-  --error: #B94A34;
-  --error-wash: #F6E1DB;
+  --brand: #FF8FA8;
+  --brand-strong: #F2678F;
+  --brand-wash: #FFE3EA;
 
-  --font-display: Georgia, "Iowan Old Style", "Noto Serif", "Times New Roman", serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, monospace;
+  --matcha: #62B487;
+  --matcha-strong: #479269;
+  --matcha-wash: #E1F3E7;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  --yolk: #F0B937;
+  --yolk-strong: #CC971C;
+  --yolk-wash: #FFF3D6;
+
+  --taro: #B092D9;
+  --taro-strong: #9575C4;
+  --taro-wash: #ECE3F9;
+
+  --miss: #FF8477;
+  --miss-strong: #E56555;
+  --miss-wash: #FFE4E0;
+
+  --shadow: 0 16px 32px -18px rgba(74, 51, 57, 0.3);
+  --shadow-soft: 0 8px 16px -12px rgba(74, 51, 57, 0.22);
+
+  --font-display: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-body);
+
+  --radius: 20px;
+  --radius-sm: 14px;
 
   font-family: var(--font-body);
   color-scheme: light dark;
@@ -32,25 +66,36 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #10161A;
-    --paper: #1A2226;
-    --paper-raised: #202A2E;
-    --ink: #E9EAE2;
-    --ink-muted: #93A098;
-    --ink-faint: #67716C;
-    --border: #2B3538;
+    --bg: #241A1F;
+    --paper: #322128;
+    --paper-raised: #2B1E24;
+    --ink: #FBEEF1;
+    --ink-muted: #CBA3AC;
+    --ink-faint: #7D616A;
+    --border: #4A3540;
 
-    --accent: #E2A25A;
-    --accent-strong: #F3C48A;
-    --accent-wash: #3A2E1C;
-    --teal: #6FB8AE;
-    --teal-wash: #1B2E2B;
-    --indigo: #8CA6C2;
-    --indigo-wash: #1E2733;
-    --success: #6FBF86;
-    --success-wash: #1D2E22;
-    --error: #E3846C;
-    --error-wash: #33211C;
+    --brand: #FF9FB6;
+    --brand-strong: #FFB4C6;
+    --brand-wash: #4A2C37;
+
+    --matcha: #7FD9A6;
+    --matcha-strong: #9EE6BA;
+    --matcha-wash: #22392C;
+
+    --yolk: #FFD873;
+    --yolk-strong: #FFE49A;
+    --yolk-wash: #453116;
+
+    --taro: #C7ACEE;
+    --taro-strong: #D6C0F4;
+    --taro-wash: #33274A;
+
+    --miss: #FF9C90;
+    --miss-strong: #FFB3A8;
+    --miss-wash: #452420;
+
+    --shadow: 0 16px 32px -16px rgba(0, 0, 0, 0.55);
+    --shadow-soft: 0 8px 16px -12px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -68,6 +113,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -75,14 +121,14 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.2;
   text-wrap: balance;
   margin: 0 0 12px;
 }
 
 a {
-  color: var(--teal);
+  color: var(--brand-strong);
 }
 
 a:focus-visible,
@@ -90,7 +136,7 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -112,18 +158,24 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 800;
   color: var(--ink);
   background: var(--paper-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 16px;
   cursor: pointer;
+  transition: border-color 0.14s ease, transform 0.12s ease;
 }
 
 .btn:hover:not(:disabled) {
   border-color: var(--ink-faint);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .btn:disabled {
@@ -132,65 +184,78 @@ button {
 }
 
 .btn-primary {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
   color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--brand);
+  border-color: var(--brand);
+  box-shadow: 0 10px 18px -9px rgba(255, 143, 168, 0.8);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
 
 /* Shared level pill, used on lesson cards and stat rows */
 .level-pill {
   display: inline-block;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
   white-space: nowrap;
 }
 
 .level-pill--a1 {
-  background: var(--teal-wash);
-  color: var(--teal);
+  background: var(--matcha-wash);
+  color: var(--matcha-strong);
 }
 
 .level-pill--a2 {
-  background: var(--accent-wash);
-  color: var(--accent-strong);
+  background: var(--yolk-wash);
+  color: var(--yolk-strong);
 }
 
 .level-pill--b1 {
-  background: var(--indigo-wash);
-  color: var(--indigo);
+  background: var(--taro-wash);
+  color: var(--taro-strong);
 }
 
 /* Shared card surface */
 .card {
   background: var(--paper-raised);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
+  box-shadow: var(--shadow-soft);
 }
 
 kbd {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
+  font-weight: 700;
   font-size: 10.5px;
   background: var(--paper);
   border: 1px solid var(--border);
   border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 1px 5px;
+  border-radius: 5px;
+  padding: 1px 6px;
 }
 
 [role="alert"] {
-  background: var(--error-wash);
-  color: var(--error);
+  background: var(--miss-wash);
+  color: var(--miss-strong);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   font-size: 13.5px;
+  font-weight: 700;
 }
