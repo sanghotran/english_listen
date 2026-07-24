@@ -87,18 +87,49 @@ pub fn lesson_id_from_url(url: &str) -> Option<String> {
     LESSON_ID_IN_URL_RE.captures(url).map(|c| c[1].to_string())
 }
 
+const MAX_RATE_LIMIT_RETRIES: u32 = 5;
+const DEFAULT_RETRY_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Delay `fetch_new_lessons` should sleep between exercise page fetches. Confirmed by hand:
+/// hammering real exercise URLs back-to-back with no delay gets rate-limited (HTTP 429) after
+/// ~50-55 requests, while 200-350ms of spacing ran 40-50 requests straight through with none.
+pub const REQUEST_PACING: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// GETs `url` as text, retrying on HTTP 429 (confirmed by hand: dailydictation.com's Cloudflare
+/// front end starts rate-limiting a sequential scraper after roughly 50-55 requests with no
+/// delay between them) — honors `Retry-After` when the response sends one, otherwise backs off
+/// a flat few seconds. `fetch_new_lessons` also paces requests between calls so this should
+/// rarely trigger, but a lesson shouldn't be silently dropped just because of a transient 429.
+async fn get_text_with_retry(client: &reqwest::Client, url: &str) -> Result<String, AppError> {
+    for attempt in 0..=MAX_RATE_LIMIT_RETRIES {
+        let response = client
+            .get(url)
+            .header("User-Agent", CHROME_USER_AGENT)
+            .send()
+            .await?;
+
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RATE_LIMIT_RETRIES {
+            let wait = response
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .map(std::time::Duration::from_secs)
+                .unwrap_or(DEFAULT_RETRY_AFTER);
+            tokio::time::sleep(wait).await;
+            continue;
+        }
+
+        return Ok(response.error_for_status()?.text().await?);
+    }
+    unreachable!("loop always returns on its last iteration (attempt == MAX_RATE_LIMIT_RETRIES)")
+}
+
 /// Lists every exercise URL in a category via its sitemap (not the paginated HTML browse page —
 /// the sitemap gives the full catalog in one request).
 pub async fn fetch_category_urls(client: &reqwest::Client, slug: &str) -> Result<Vec<String>, AppError> {
     let url = format!("https://dailydictation.com/sitemap.exercises-{slug}.xml");
-    let body = client
-        .get(&url)
-        .header("User-Agent", CHROME_USER_AGENT)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
+    let body = get_text_with_retry(client, &url).await?;
     Ok(parse_sitemap_urls(&body))
 }
 
@@ -110,15 +141,7 @@ pub fn parse_sitemap_urls(xml: &str) -> Vec<String> {
 /// for lessons with no downloadable audio (YouTube-embedded categories) or malformed pages —
 /// same "skip, don't fail the whole refresh" policy the old VOA ingestion used.
 pub async fn fetch_exercise(client: &reqwest::Client, url: &str) -> Result<Option<ScrapedLesson>, AppError> {
-    let html = client
-        .get(url)
-        .header("User-Agent", CHROME_USER_AGENT)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-
+    let html = get_text_with_retry(client, url).await?;
     Ok(extract_lesson(&html, url))
 }
 

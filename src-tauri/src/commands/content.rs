@@ -80,6 +80,9 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
                 }
             }
 
+            // Paced to stay under dailydictation.com's rate limit — see REQUEST_PACING.
+            tokio::time::sleep(crate::scraper::daily_dictation::REQUEST_PACING).await;
+
             let lesson = match crate::scraper::daily_dictation::fetch_exercise(&client, &url).await {
                 Ok(Some(lesson)) => lesson,
                 // No downloadable audio (YouTube-embedded categories) or a fetch/parse
