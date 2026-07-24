@@ -8,6 +8,9 @@
 -- dropped below — "no such table: main.lessons_old" on the next segment/attempt insert. With it
 -- on, the rename doesn't touch other tables' schemas, so they keep referencing plain "lessons",
 -- which resolves correctly again once the new table below is created under that same name.
+-- (This pragma only has an effect because `foreign_keys` is off connection-wide — see the
+-- comment on `db::connect` — toggling `foreign_keys` itself from inside this file wouldn't work,
+-- since sqlx runs each migration in a transaction and that pragma is a no-op mid-transaction.)
 PRAGMA legacy_alter_table = ON;
 
 ALTER TABLE lessons RENAME TO lessons_old;

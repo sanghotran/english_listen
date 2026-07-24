@@ -5,8 +5,17 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 /// Connects to the given SQLite database URL and runs all pending migrations.
+///
+/// `foreign_keys(false)`: this app never deletes a `lessons` row (no such command exists), so FK
+/// enforcement was never protecting anything here — and it actively breaks the table-rebuild
+/// dance migrations like `0006_b2_level.sql` use to widen a CHECK constraint (that pattern needs
+/// `PRAGMA legacy_alter_table`, which itself only has an effect while `foreign_keys` is off; since
+/// `foreign_keys` is a no-op to toggle *inside* a transaction and sqlx runs each migration in one,
+/// it has to already be off before migrations start, not toggled from within a migration file).
 pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
-    let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
+    let options = SqliteConnectOptions::from_str(database_url)?
+        .create_if_missing(true)
+        .foreign_keys(false);
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
     sqlx::migrate!("./src/db/migrations").run(&pool).await?;
     Ok(pool)
