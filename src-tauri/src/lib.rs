@@ -2,15 +2,24 @@ mod commands;
 mod db;
 mod diff;
 mod error;
+mod logging;
 mod scraper;
 
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    logging::init();
+
     tauri::Builder::default()
         .setup(|app| {
-            let (pool, data_dir) = tauri::async_runtime::block_on(db::init_pool())?;
+            let (pool, data_dir) = match tauri::async_runtime::block_on(db::init_pool()) {
+                Ok(ok) => ok,
+                Err(err) => {
+                    logging::append(&format!("FATAL: failed to initialize database: {err}"));
+                    return Err(err.into());
+                }
+            };
             app.manage(pool);
             // Audio files are cached at {exe_dir}/audio — allow that exact runtime-resolved
             // path since it can't be expressed as a static glob in tauri.conf.json (there is
