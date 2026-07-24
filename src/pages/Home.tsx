@@ -12,7 +12,7 @@ const LEVEL_CLASS: Record<CefrLevel, string> = {
 };
 
 export default function Home() {
-  const { lessons, isLoading, error, levelFilter, loadLessons, setLevelFilter, getLessonsByLevel, refreshFromVoa } =
+  const { lessons, isLoading, error, levelFilter, loadLessons, setLevelFilter, getLessonsByLevel, refreshLessons } =
     useLessonStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -23,7 +23,7 @@ export default function Home() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await refreshFromVoa();
+      await refreshLessons();
     } catch {
       // error is already surfaced via the store's `error` field
     } finally {
@@ -42,16 +42,16 @@ export default function Home() {
         <h1>English Listen</h1>
         <button type="button" className="btn" onClick={handleRefresh} disabled={isRefreshing}>
           {isRefreshing && <span className="spinner" aria-hidden="true" />}
-          {isRefreshing ? "Refreshing…" : "Refresh from VOA"}
+          {isRefreshing ? "Refreshing…" : "Refresh lessons"}
         </button>
       </div>
       <LevelSelector value={levelFilter} onChange={setLevelFilter} />
       <div className="lesson-grid">
         {visibleLessons.map((lesson) => (
-          <Link key={lesson.id} to={`/practice/${encodeURIComponent(lesson.id)}`} className="lesson-card">
+          <Link key={lesson.id} to={`/practice/${lesson.id}`} className="lesson-card">
             <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
             <h3>{lesson.title}</h3>
-            <p className="lesson-card__meta">{lesson.sourceShow}</p>
+            <p className="lesson-card__meta">{lesson.category}</p>
           </Link>
         ))}
       </div>

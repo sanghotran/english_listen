@@ -1,9 +1,10 @@
-// Thin, typed wrappers around @tauri-apps/api invoke() for the 8 Rust commands
+// Thin, typed wrappers around @tauri-apps/api invoke() for the Rust commands
 // (src-tauri/src/commands/{content,audio}.rs). JS camelCase arg names are auto-mapped
 // to the commands' snake_case Rust parameters by Tauri's IPC layer.
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { Lesson } from "../types/lesson";
 import type { Attempt, LevelProgress } from "../types/progress";
+import type { Segment } from "../types/segment";
 
 export interface FetchResult {
   new: number;
@@ -15,6 +16,10 @@ export function listLessons(): Promise<Lesson[]> {
 
 export function getLesson(id: string): Promise<Lesson> {
   return invoke("get_lesson", { id });
+}
+
+export function listSegments(lessonId: string): Promise<Segment[]> {
+  return invoke("list_segments", { lessonId });
 }
 
 export function fetchNewLessons(): Promise<FetchResult> {

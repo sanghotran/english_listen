@@ -6,9 +6,9 @@ use sqlx::SqlitePool;
 use tauri::State;
 use tokio::io::AsyncWriteExt;
 
-/// `lesson_id` is the VOA article URL (see `fetch_new_lessons`), not filesystem-safe on its
-/// own — it embeds `/` and `:`, which `Path::join` would read as nested (non-existent)
-/// directories. Collapse it down to a flat, safe filename.
+/// `lesson_id` is dailydictation.com's numeric lesson id (a plain string, e.g. "399") — this is
+/// just a defensive flattening in case that ever stops holding, so a stray `/` or `:` can't be
+/// read by `Path::join` as a nested (non-existent) directory.
 fn safe_filename(lesson_id: &str) -> String {
     lesson_id
         .chars()
@@ -17,7 +17,7 @@ fn safe_filename(lesson_id: &str) -> String {
 }
 
 /// Streams the lesson's mp3 to `{exe_dir}/audio/{safe_filename(lesson_id)}.mp3` and records
-/// the local path — the frontend never opens the VOA URL directly in the webview (see
+/// the local path — the frontend never opens the source URL directly in the webview (see
 /// `get_lesson_audio_path`).
 #[tauri::command]
 pub async fn download_audio(
@@ -60,7 +60,7 @@ pub async fn download_audio(
 }
 
 /// Returns the local mp3 path (if downloaded) for the frontend to resolve via `convertFileSrc()` —
-/// the webview never opens the VOA URL directly.
+/// the webview never opens the source URL directly.
 #[tauri::command]
 pub async fn get_lesson_audio_path(
     pool: State<'_, SqlitePool>,

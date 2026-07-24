@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as tauriService from "../services/tauri";
 import type { CefrLevel, Lesson } from "../types/lesson";
+import type { Segment } from "../types/segment";
 import { errorMessage } from "../utils/error";
 
 interface LessonStore {
@@ -8,12 +9,15 @@ interface LessonStore {
   levelFilter: CefrLevel | "ALL";
   isLoading: boolean;
   error: string | null;
+  segmentsByLesson: Record<string, Segment[]>;
   setLevelFilter: (level: CefrLevel | "ALL") => void;
   loadLessons: () => Promise<void>;
-  refreshFromVoa: () => Promise<number>;
+  refreshLessons: () => Promise<number>;
   ensureAudioDownloaded: (lessonId: string) => Promise<string>;
   getLessonById: (id: string) => Lesson | undefined;
   getLessonsByLevel: (level: CefrLevel | "ALL") => Lesson[];
+  loadSegments: (lessonId: string) => Promise<void>;
+  getSegmentsForLesson: (lessonId: string) => Segment[];
 }
 
 export const useLessonStore = create<LessonStore>((set, get) => ({
@@ -21,6 +25,7 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
   levelFilter: "ALL",
   isLoading: false,
   error: null,
+  segmentsByLesson: {},
 
   setLevelFilter: (level) => set({ levelFilter: level }),
 
@@ -36,7 +41,7 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
     }
   },
 
-  refreshFromVoa: async () => {
+  refreshLessons: async () => {
     set({ isLoading: true, error: null });
     try {
       const result = await tauriService.fetchNewLessons();
@@ -44,7 +49,7 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
       set({ lessons, isLoading: false });
       return result.new;
     } catch (err) {
-      console.error("refreshFromVoa failed", err);
+      console.error("refreshLessons failed", err);
       set({ error: errorMessage(err), isLoading: false });
       throw err;
     }
@@ -58,4 +63,13 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
     const { lessons } = get();
     return level === "ALL" ? lessons : lessons.filter((l) => l.level === level);
   },
+
+  loadSegments: async (lessonId) => {
+    const segments = await tauriService.listSegments(lessonId);
+    set((state) => ({
+      segmentsByLesson: { ...state.segmentsByLesson, [lessonId]: segments },
+    }));
+  },
+
+  getSegmentsForLesson: (lessonId) => get().segmentsByLesson[lessonId] ?? [],
 }));

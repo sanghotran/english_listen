@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AudioPlayer from "../components/AudioPlayer/AudioPlayer";
 import DictationInput from "../components/DictationInput/DictationInput";
@@ -8,15 +8,12 @@ import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
 import { errorMessage } from "../utils/error";
-import { segmentAudioBounds, segmentTranscript } from "../utils/segments";
 import "./Practice.css";
 
 export default function Practice() {
-  const { lessonId: rawLessonId } = useParams<{ lessonId: string }>();
-  // Lesson ids are VOA article URLs (see fetch_new_lessons), so Home encodes them for the
-  // route and we decode back here — the raw URL contains slashes that break route matching.
-  const lessonId = rawLessonId ? decodeURIComponent(rawLessonId) : undefined;
-  const { lessons, loadLessons, getLessonById, ensureAudioDownloaded } = useLessonStore();
+  const { lessonId } = useParams<{ lessonId: string }>();
+  const { lessons, loadLessons, getLessonById, ensureAudioDownloaded, loadSegments, getSegmentsForLesson } =
+    useLessonStore();
   const { submitAttempt, getAttemptsForLesson, getAttemptsForSegment, loadAttempts } = useProgressStore();
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
@@ -30,15 +27,12 @@ export default function Practice() {
     if (lessonId) loadAttempts(lessonId);
   }, [lessonId, loadAttempts]);
 
+  useEffect(() => {
+    if (lessonId) loadSegments(lessonId);
+  }, [lessonId, loadSegments]);
+
   const lesson = lessonId ? getLessonById(lessonId) : undefined;
-
-  // A full ~5 minute transcript is too much to dictate in one pass, so it's split into a few
-  // sentences at a time (more per segment at higher levels — see utils/segments.ts).
-  const segments = useMemo(() => (lesson ? segmentTranscript(lesson.transcript, lesson.level) : []), [lesson]);
-
-  // No per-sentence timestamps from VOA, so the audio window for the current segment is
-  // approximated proportionally by word count (see utils/segments.ts) rather than split files.
-  const audioBounds = useMemo(() => segmentAudioBounds(segments, segmentIndex), [segments, segmentIndex]);
+  const segments = lessonId ? getSegmentsForLesson(lessonId) : [];
 
   useEffect(() => {
     setSegmentIndex(0);
@@ -62,7 +56,8 @@ export default function Practice() {
     };
   }, [lesson, ensureAudioDownloaded]);
 
-  const { input, setInput, result, submit, reset } = useDictationSession(segments[segmentIndex] ?? "");
+  const segment = segments[segmentIndex];
+  const { input, setInput, result, submit, reset } = useDictationSession(segment?.content ?? "");
 
   useEffect(() => {
     reset();
@@ -70,6 +65,7 @@ export default function Practice() {
 
   if (lessons.length === 0) return <p>Loading lesson...</p>;
   if (!lesson) return <p role="alert">Lesson not found. <Link to="/">Back to lessons</Link></p>;
+  if (segments.length === 0) return <p>Loading segments...</p>;
 
   const lessonAttempts = getAttemptsForLesson(lesson.id);
   const segmentAttempts = getAttemptsForSegment(lesson.id, segmentIndex);
@@ -89,8 +85,8 @@ export default function Practice() {
       <h1>{lesson.title}</h1>
       <ProgressTracker level={lesson.level} attemptCount={segmentAttempts.length} bestAccuracy={bestAccuracy} />
       {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
-      {audioSrc ? (
-        <AudioPlayer src={audioSrc} bounds={audioBounds} />
+      {audioSrc && segment ? (
+        <AudioPlayer src={audioSrc} bounds={{ startTime: segment.timeStart, endTime: segment.timeEnd }} />
       ) : (
         !audioError && <p className="practice-page__status">Downloading audio…</p>
       )}

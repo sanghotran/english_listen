@@ -6,14 +6,24 @@ pub struct Lesson {
     pub id: String,
     pub title: String,
     pub level: String,
+    pub category: String,
     pub audio_url: String,
     pub local_audio_path: Option<String>,
-    pub transcript: String,
-    pub published_at: String,
-    pub guid: String,
-    pub source_show: String,
-    pub word_count: i64,
     pub page_url: String,
+    pub published_at: String,
+}
+
+/// One dictated sentence within a lesson, with its exact cut points into the lesson's single
+/// audio file (authored by the source, not estimated — see scraper::daily_dictation).
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct Segment {
+    pub id: i64,
+    pub lesson_id: String,
+    pub position: i64,
+    pub content: String,
+    pub time_start: f64,
+    pub time_end: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

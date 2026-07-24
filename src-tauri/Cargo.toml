@@ -1,7 +1,7 @@
 [package]
 name = "english_listen"
 version = "0.1.0"
-description = "Dictation app for English listening practice using VOA Learning English content"
+description = "Dictation app for English listening practice using dailydictation.com content"
 edition = "2021"
 
 [build-dependencies]
@@ -15,8 +15,6 @@ sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "migrate"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
-rss = "2"
-scraper = "0.19"
 futures-util = "0.3"
 regex = "1"
 once_cell = "1"

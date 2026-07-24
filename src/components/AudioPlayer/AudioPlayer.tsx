@@ -3,8 +3,8 @@ import "./AudioPlayer.css";
 
 interface AudioPlayerProps {
   src: string;
-  /** Clamps playback to this fraction-of-duration window (see useAudioPlayer). Omit to play
-   * the whole track. */
+  /** Clamps playback to this [startTime, endTime] window in seconds (see useAudioPlayer). Omit
+   * to play the whole track. */
   bounds?: AudioSegmentBounds;
 }
 

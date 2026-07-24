@@ -4,10 +4,9 @@ export interface Lesson {
   id: string;
   title: string;
   level: CefrLevel;
-  sourceShow: string;
+  category: string;
   audioUrl: string;
   localAudioPath?: string;
-  transcript: string;
   pageUrl: string;
   publishedAt: string;
 }

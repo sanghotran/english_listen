@@ -10,19 +10,24 @@ const LESSON = {
   id: "lesson-test",
   title: "Test Lesson",
   level: "A2" as const,
-  sourceShow: "Test Show",
+  category: "english-conversations",
   audioUrl: "https://example.com/audio.mp3",
   localAudioPath: "/tmp/lesson-test.mp3",
-  transcript: "hello world today",
   pageUrl: "https://example.com/page",
   publishedAt: "2026-01-01",
 };
+
+const SEGMENTS = [
+  { id: 1, lessonId: LESSON.id, position: 0, content: "hello world today", timeStart: 0, timeEnd: 3 },
+];
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
     switch (cmd) {
       case "list_lessons":
         return [LESSON];
+      case "list_segments":
+        return SEGMENTS;
       case "get_lesson_audio_path":
         return LESSON.localAudioPath;
       case "download_audio":
@@ -47,7 +52,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 beforeEach(() => {
-  useLessonStore.setState({ lessons: [], levelFilter: "ALL", isLoading: false, error: null });
+  useLessonStore.setState({ lessons: [], levelFilter: "ALL", isLoading: false, error: null, segmentsByLesson: {} });
   useProgressStore.setState({ attemptsByLesson: {}, levelProgress: [] });
   window.history.pushState({}, "", "/");
 });
@@ -65,7 +70,7 @@ describe("dictation flow (smoke test, no real browser available in this sandbox)
     // Practice page for that lesson.
     expect(await screen.findByRole("heading", { name: "Test Lesson" })).toBeInTheDocument();
 
-    const textarea = screen.getByPlaceholderText(/Type what you hear/);
+    const textarea = await screen.findByPlaceholderText(/Type what you hear/);
     await user.type(textarea, "hello word today");
     await user.click(screen.getByRole("button", { name: "Check" }));
 

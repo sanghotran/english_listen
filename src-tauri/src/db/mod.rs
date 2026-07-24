@@ -44,46 +44,65 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn migrations_run_and_lesson_attempt_roundtrip() {
+    async fn migrations_run_and_lesson_segment_attempt_roundtrip() {
         let pool = connect("sqlite::memory:")
             .await
             .expect("migrations should run cleanly on a fresh in-memory db");
 
         sqlx::query(
-            "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO lessons (id, title, level, category, audio_url, page_url, published_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind("lesson-1")
-        .bind("Sew and Knit")
-        .bind("A2")
-        .bind("https://voa-audio.voanews.eu/sew-and-knit.mp3")
-        .bind("This is a transcript.")
-        .bind("2026-07-01T00:00:00Z")
-        .bind("guid-1")
-        .bind("As It Is")
-        .bind(4_i64)
+        .bind("399")
+        .bind("1. At home (1)")
+        .bind("A1")
+        .bind("english-conversations")
+        .bind("https://dailydictation.com/upload/.../1-at-home.mp3")
+        .bind("https://dailydictation.com/exercises/english-conversations/1-at-home-1.399/listen-and-type")
+        .bind("2026-07-24T00:00:00Z")
         .execute(&pool)
         .await
         .expect("lesson insert should succeed");
 
+        sqlx::query(
+            "INSERT INTO segments (lesson_id, position, content, time_start, time_end)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind("399")
+        .bind(0_i64)
+        .bind("Where is Jane?")
+        .bind(3.39_f64)
+        .bind(4.88_f64)
+        .execute(&pool)
+        .await
+        .expect("segment insert should succeed");
+
         let lesson: models::Lesson = sqlx::query_as("SELECT * FROM lessons WHERE id = ?")
-            .bind("lesson-1")
+            .bind("399")
             .fetch_one(&pool)
             .await
             .expect("lesson should be queryable back");
-        assert_eq!(lesson.guid, "guid-1");
-        assert_eq!(lesson.word_count, 4);
+        assert_eq!(lesson.category, "english-conversations");
+
+        let segment: models::Segment = sqlx::query_as("SELECT * FROM segments WHERE lesson_id = ? AND position = ?")
+            .bind("399")
+            .bind(0_i64)
+            .fetch_one(&pool)
+            .await
+            .expect("segment should be queryable back");
+        assert_eq!(segment.content, "Where is Jane?");
 
         sqlx::query(
-            "INSERT INTO attempts (lesson_id, accuracy, attempted_at, user_transcript, correct_count, missing_count, extra_count)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO attempts (lesson_id, segment_index, accuracy, attempted_at, user_transcript, correct_count, missing_count, extra_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind("lesson-1")
+        .bind("399")
+        .bind(0_i64)
         .bind(0.75_f64)
-        .bind("2026-07-02T00:00:00Z")
-        .bind("this is a transcript")
+        .bind("2026-07-24T00:01:00Z")
+        .bind("where is jane")
         .bind(3_i64)
-        .bind(1_i64)
+        .bind(0_i64)
         .bind(0_i64)
         .execute(&pool)
         .await
@@ -91,28 +110,24 @@ mod tests {
 
         let attempt_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM attempts WHERE lesson_id = ?")
-                .bind("lesson-1")
+                .bind("399")
                 .fetch_one(&pool)
                 .await
                 .expect("attempt count query should succeed");
         assert_eq!(attempt_count, 1);
 
-        // Duplicate guid must be rejected by the unique index added in 0002_refine.sql.
+        // Duplicate (lesson_id, position) must be rejected by the unique index on segments.
         let dup = sqlx::query(
-            "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO segments (lesson_id, position, content, time_start, time_end)
+             VALUES (?, ?, ?, ?, ?)",
         )
-        .bind("lesson-2")
-        .bind("Another Episode")
-        .bind("B1")
-        .bind("https://voa-audio.voanews.eu/another.mp3")
-        .bind("Another transcript.")
-        .bind("2026-07-03T00:00:00Z")
-        .bind("guid-1")
-        .bind("Words and Their Stories")
-        .bind(2_i64)
+        .bind("399")
+        .bind(0_i64)
+        .bind("Duplicate position.")
+        .bind(0.0_f64)
+        .bind(1.0_f64)
         .execute(&pool)
         .await;
-        assert!(dup.is_err(), "duplicate guid should violate unique index");
+        assert!(dup.is_err(), "duplicate (lesson_id, position) should violate unique index");
     }
 }

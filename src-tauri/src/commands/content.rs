@@ -1,4 +1,4 @@
-use crate::db::models::{Attempt, Lesson, LevelProgress};
+use crate::db::models::{Attempt, Lesson, LevelProgress, Segment};
 use crate::diff::{self, WordStatus};
 use crate::error::AppError;
 use serde::Serialize;
@@ -33,74 +33,93 @@ pub async fn get_lesson(pool: State<'_, SqlitePool>, id: String) -> Result<Lesso
     fetch_lesson(pool.inner(), &id).await
 }
 
+#[tauri::command]
+pub async fn list_segments(pool: State<'_, SqlitePool>, lesson_id: String) -> Result<Vec<Segment>, AppError> {
+    let segments = sqlx::query_as::<_, Segment>(
+        "SELECT * FROM segments WHERE lesson_id = ? ORDER BY position",
+    )
+    .bind(&lesson_id)
+    .fetch_all(pool.inner())
+    .await?;
+    Ok(segments)
+}
+
 #[derive(Debug, Serialize)]
 pub struct FetchResult {
     pub new: u32,
 }
 
-/// Pulls the 4 confirmed VOA show feeds, opens each episode page for audio+transcript, and
-/// upserts by `guid` — re-running this is naturally idempotent (a second run reports `new: 0`
-/// once nothing has changed upstream), so no separate "last seen" bookkeeping is needed.
+/// Walks each configured dailydictation.com category's sitemap and ingests exercises this DB
+/// doesn't have yet. Unlike the old VOA RSS ingestion (which always re-fetched every episode
+/// page to check for updates), a lesson id already in the DB is skipped without even fetching
+/// its page — dailydictation content doesn't change post-publish, and re-fetching all ~1000+
+/// pages on every refresh click would make "Refresh" unusably slow after the first run.
 #[tauri::command]
 pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResult, AppError> {
     let client = reqwest::Client::new();
 
-    let existing_guids: std::collections::HashSet<String> =
-        sqlx::query_scalar("SELECT guid FROM lessons")
-            .fetch_all(pool.inner())
-            .await?
-            .into_iter()
-            .collect();
+    let existing_ids: std::collections::HashSet<String> = sqlx::query_scalar("SELECT id FROM lessons")
+        .fetch_all(pool.inner())
+        .await?
+        .into_iter()
+        .collect();
 
     let mut new_count: u32 = 0;
 
-    for feed in crate::scraper::feeds::FEEDS {
-        let items = match crate::scraper::voa_rss::fetch_feed(&client, &feed.url()).await {
-            Ok(items) => items,
-            // One unreachable feed shouldn't abort the whole refresh.
+    for category in crate::scraper::daily_dictation::CATEGORIES {
+        let urls = match crate::scraper::daily_dictation::fetch_category_urls(&client, category.slug).await {
+            Ok(urls) => urls,
+            // One unreachable category sitemap shouldn't abort the whole refresh.
             Err(_) => continue,
         };
 
-        for item in items {
-            let episode = match crate::scraper::transcript::fetch_episode(&client, &item.link).await {
-                Ok(Some(episode)) => episode,
-                // Missing audio/transcript (video-only, audio-only items) or a fetch failure:
-                // skip, not an error — see docs/PLAN.md Phase 4.
+        for url in urls {
+            if let Some(id) = crate::scraper::daily_dictation::lesson_id_from_url(&url) {
+                if existing_ids.contains(&id) {
+                    continue;
+                }
+            }
+
+            let lesson = match crate::scraper::daily_dictation::fetch_exercise(&client, &url).await {
+                Ok(Some(lesson)) => lesson,
+                // No downloadable audio (YouTube-embedded categories) or a fetch/parse
+                // failure: skip, not an error — matches VOA ingestion's original skip policy.
                 Ok(None) | Err(_) => continue,
             };
 
-            let word_count = episode.transcript.split_whitespace().count() as i64;
-            let is_new = !existing_guids.contains(&item.guid);
+            if existing_ids.contains(&lesson.id) {
+                continue;
+            }
 
             sqlx::query(
-                "INSERT INTO lessons (id, title, level, audio_url, transcript, published_at, guid, source_show, word_count, page_url)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(guid) DO UPDATE SET
-                    title = excluded.title,
-                    level = excluded.level,
-                    audio_url = excluded.audio_url,
-                    transcript = excluded.transcript,
-                    published_at = excluded.published_at,
-                    source_show = excluded.source_show,
-                    word_count = excluded.word_count,
-                    page_url = excluded.page_url",
+                "INSERT INTO lessons (id, title, level, category, audio_url, page_url, published_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
             )
-            .bind(&item.guid)
-            .bind(&item.title)
-            .bind(feed.level)
-            .bind(&episode.audio_url)
-            .bind(&episode.transcript)
-            .bind(&item.pub_date)
-            .bind(&item.guid)
-            .bind(feed.show)
-            .bind(word_count)
-            .bind(&item.link)
+            .bind(&lesson.id)
+            .bind(&lesson.title)
+            .bind(category.level)
+            .bind(category.slug)
+            .bind(&lesson.audio_url)
+            .bind(&lesson.page_url)
+            .bind(chrono::Utc::now().to_rfc3339())
             .execute(pool.inner())
             .await?;
 
-            if is_new {
-                new_count += 1;
+            for segment in &lesson.segments {
+                sqlx::query(
+                    "INSERT INTO segments (lesson_id, position, content, time_start, time_end)
+                     VALUES (?, ?, ?, ?, ?)",
+                )
+                .bind(&lesson.id)
+                .bind(segment.position)
+                .bind(&segment.content)
+                .bind(segment.time_start)
+                .bind(segment.time_end)
+                .execute(pool.inner())
+                .await?;
             }
+
+            new_count += 1;
         }
     }
 
@@ -114,16 +133,16 @@ pub async fn record_attempt(
     segment_index: i64,
     user_transcript: String,
 ) -> Result<Attempt, AppError> {
-    let lesson = fetch_lesson(pool.inner(), &lesson_id).await?;
+    // Never trust a reference text the client could send directly — look the segment's
+    // authored content up server-side by (lesson_id, position).
+    let segment: (String,) = sqlx::query_as("SELECT content FROM segments WHERE lesson_id = ? AND position = ?")
+        .bind(&lesson_id)
+        .bind(segment_index)
+        .fetch_optional(pool.inner())
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("segment {segment_index} of lesson '{lesson_id}' not found")))?;
 
-    // Recomputed server-side from the lesson transcript + level, same as the whole-transcript
-    // scoring below it replaced — never trust a reference text the client could send directly.
-    let segment_reference = crate::segments::segment_transcript(&lesson.transcript, &lesson.level)
-        .into_iter()
-        .nth(segment_index as usize)
-        .ok_or_else(|| AppError::NotFound(format!("segment {segment_index} out of range")))?;
-
-    let tokens = diff::diff_words(&user_transcript, &segment_reference);
+    let tokens = diff::diff_words(&user_transcript, &segment.0);
     let accuracy = diff::compute_accuracy(&tokens);
     let correct_count = tokens.iter().filter(|t| t.status == WordStatus::Correct).count() as i64;
     let missing_count = tokens.iter().filter(|t| t.status == WordStatus::Missing).count() as i64;
@@ -165,7 +184,7 @@ pub async fn list_attempts(
 }
 
 /// Aggregated on the fly (GROUP BY) rather than a materialized table, to avoid drift if an
-/// aggregate update is ever missed — see docs/PLAN.md Phase 2.
+/// aggregate update is ever missed.
 #[tauri::command]
 pub async fn get_level_progress(
     pool: State<'_, SqlitePool>,

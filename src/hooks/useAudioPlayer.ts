@@ -8,21 +8,20 @@ export interface AudioPlayerState {
 }
 
 export interface AudioSegmentBounds {
-  /** Fraction (0-1) of the track's total duration where this segment starts. */
-  startFraction: number;
-  /** Fraction (0-1) of the track's total duration where this segment ends. */
-  endFraction: number;
+  /** Seconds into the track where this segment starts. */
+  startTime: number;
+  /** Seconds into the track where this segment ends (Infinity = play to the end of the track). */
+  endTime: number;
 }
 
-const FULL_TRACK: AudioSegmentBounds = { startFraction: 0, endFraction: 1 };
+const FULL_TRACK: AudioSegmentBounds = { startTime: 0, endTime: Number.POSITIVE_INFINITY };
 
 /** Encapsulates an <audio> element: play/pause/seek/rate + current time, keyed by src.
  *
- * `bounds` clamps playback to a fraction-of-duration window: VOA gives no per-sentence
- * timestamps, so a dictation segment's audio start/end are approximated proportionally from
- * its share of the transcript's word count rather than split into separate files. Seeks to the
- * segment start when `bounds` changes, auto-pauses at its end, and clamps manual seeks/replay
- * to the window — so "Play"/"Replay" always loop just that segment's slice of the one file. */
+ * `bounds` clamps playback to an exact [startTime, endTime] window in seconds — the segment's
+ * own authored cut points (see types/segment.ts), not an estimate. Seeks to the segment start
+ * when `bounds` changes, auto-pauses at its end, and clamps manual seeks/replay to the window —
+ * so "Play"/"Replay" always loop just that segment's slice of the one audio file. */
 export function useAudioPlayer(src: string | null, bounds: AudioSegmentBounds = FULL_TRACK) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, setState] = useState<AudioPlayerState>({
@@ -32,16 +31,18 @@ export function useAudioPlayer(src: string | null, bounds: AudioSegmentBounds = 
     playbackRate: 1,
   });
 
-  const { startFraction, endFraction } = bounds;
-  const startTime = state.duration * startFraction;
-  const endTime = state.duration > 0 ? state.duration * endFraction : 0;
+  const { startTime } = bounds;
+  // Clamp to the loaded duration once known, so a stale/out-of-range end time never leaves the
+  // player waiting past the real end of the file.
+  const endTime = state.duration > 0 ? Math.min(bounds.endTime, state.duration) : bounds.endTime;
+  const hasEnd = Number.isFinite(endTime);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const onTimeUpdate = () => {
-      if (endTime > 0 && audio.currentTime >= endTime) {
+      if (hasEnd && audio.currentTime >= endTime) {
         audio.pause();
         audio.currentTime = endTime;
       }
@@ -65,33 +66,32 @@ export function useAudioPlayer(src: string | null, bounds: AudioSegmentBounds = 
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [src, endTime]);
+  }, [src, endTime, hasEnd]);
 
   useEffect(() => {
     setState({ isPlaying: false, currentTime: 0, duration: 0, playbackRate: 1 });
   }, [src]);
 
-  // Jump to the new segment's start when navigating segments, and once duration first loads.
+  // Jump to the new segment's start when navigating segments, and once duration first loads
+  // (setting currentTime before metadata is ready can get silently reset by some webviews).
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || state.duration === 0) return;
     audio.pause();
     audio.currentTime = startTime;
     setState((s) => ({ ...s, currentTime: startTime }));
-    // startTime itself is derived from state.duration/startFraction each render, so depending
-    // on those two primitives (not the derived value) is what actually gates re-seeking.
-  }, [startFraction, state.duration]);
+  }, [startTime, state.duration]);
 
   const play = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     // Resuming right at (or past) the segment's end would just re-trigger the auto-pause on
     // the next tick — loop back to the start instead, so Play always (re)plays the segment.
-    if (endTime > 0 && audio.currentTime >= endTime - 0.05) {
+    if (hasEnd && audio.currentTime >= endTime - 0.05) {
       audio.currentTime = startTime;
     }
     audio.play();
-  }, [startTime, endTime]);
+  }, [startTime, endTime, hasEnd]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -105,10 +105,10 @@ export function useAudioPlayer(src: string | null, bounds: AudioSegmentBounds = 
   const seekTo = useCallback(
     (seconds: number) => {
       if (!audioRef.current) return;
-      const clamped = endTime > 0 ? Math.min(Math.max(seconds, startTime), endTime) : seconds;
+      const clamped = hasEnd ? Math.min(Math.max(seconds, startTime), endTime) : Math.max(seconds, startTime);
       audioRef.current.currentTime = clamped;
     },
-    [startTime, endTime],
+    [startTime, endTime, hasEnd],
   );
 
   const replayFromStart = useCallback(() => {
@@ -121,5 +121,16 @@ export function useAudioPlayer(src: string | null, bounds: AudioSegmentBounds = 
     setState((s) => ({ ...s, playbackRate: rate }));
   }, []);
 
-  return { audioRef, ...state, startTime, endTime, play, pause, toggle, seekTo, replayFromStart, setPlaybackRate };
+  return {
+    audioRef,
+    ...state,
+    startTime,
+    endTime: hasEnd ? endTime : state.duration,
+    play,
+    pause,
+    toggle,
+    seekTo,
+    replayFromStart,
+    setPlaybackRate,
+  };
 }

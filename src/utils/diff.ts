@@ -17,8 +17,9 @@ const IRREGULAR_CONTRACTIONS: Array<[RegExp, string]> = [
 
 /**
  * Expands unambiguous contractions to their full form before tokenizing, so "don't" typed as
- * "do not" (or vice versa) scores as correct — VOA transcripts use contractions, but a learner
- * may type either form. `'s`/`'d` are genuinely ambiguous (is/has, would/had) and are left alone.
+ * "do not" (or vice versa) scores as correct — source transcripts use contractions, but a
+ * learner may type either form. `'s`/`'d` are genuinely ambiguous (is/has, would/had) and are
+ * left alone.
  */
 function expandContractions(text: string): string {
   let result = text;

@@ -4,7 +4,6 @@ mod diff;
 mod error;
 mod logging;
 mod scraper;
-mod segments;
 
 use tauri::Manager;
 
@@ -33,6 +32,7 @@ pub fn run() {
             commands::content::log_frontend_error,
             commands::content::list_lessons,
             commands::content::get_lesson,
+            commands::content::list_segments,
             commands::content::fetch_new_lessons,
             commands::content::record_attempt,
             commands::content::list_attempts,
