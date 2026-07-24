@@ -1,4 +1,4 @@
-use crate::db::models::{Attempt, Lesson, LevelProgress, Segment};
+use crate::db::models::{Attempt, Lesson, LessonProgress, LevelProgress, Segment};
 use crate::diff::{self, WordStatus};
 use crate::error::AppError;
 use crate::scraper::{daily_dictation, ted, Category, ScrapedLesson};
@@ -23,7 +23,7 @@ pub fn log_frontend_error(message: String) {
 
 #[tauri::command]
 pub async fn list_lessons(pool: State<'_, SqlitePool>) -> Result<Vec<Lesson>, AppError> {
-    let lessons = sqlx::query_as::<_, Lesson>("SELECT * FROM lessons ORDER BY published_at DESC")
+    let lessons = sqlx::query_as::<_, Lesson>("SELECT * FROM lessons ORDER BY published_at ASC")
         .fetch_all(pool.inner())
         .await?;
     Ok(lessons)
@@ -308,6 +308,24 @@ pub async fn get_level_progress(
          LEFT JOIN attempts a ON a.lesson_id = l.id
          GROUP BY l.level
          ORDER BY l.level",
+    )
+    .fetch_all(pool.inner())
+    .await?;
+    Ok(progress)
+}
+
+/// Aggregated on the fly (GROUP BY), same rationale as `get_level_progress`. A segment counts
+/// as done once it has at least one attempt, regardless of accuracy.
+#[tauri::command]
+pub async fn get_lesson_progress(
+    pool: State<'_, SqlitePool>,
+) -> Result<Vec<LessonProgress>, AppError> {
+    let progress = sqlx::query_as::<_, LessonProgress>(
+        "SELECT s.lesson_id AS lesson_id,
+                CAST(COUNT(DISTINCT a.segment_index) AS REAL) / COUNT(DISTINCT s.position) AS completion
+         FROM segments s
+         LEFT JOIN attempts a ON a.lesson_id = s.lesson_id AND a.segment_index = s.position
+         GROUP BY s.lesson_id",
     )
     .fetch_all(pool.inner())
     .await?;

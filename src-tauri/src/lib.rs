@@ -37,6 +37,7 @@ pub fn run() {
             commands::content::record_attempt,
             commands::content::list_attempts,
             commands::content::get_level_progress,
+            commands::content::get_lesson_progress,
             commands::audio::download_audio,
             commands::audio::get_lesson_audio_path,
         ])

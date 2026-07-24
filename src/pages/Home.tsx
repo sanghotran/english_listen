@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import LevelSelector from "../components/LevelSelector/LevelSelector";
 import { MascotBunny } from "../components/Mascot/Mascot";
 import { useLessonStore } from "../store/lessonStore";
+import { useProgressStore } from "../store/progressStore";
 import type { CefrLevel } from "../types/lesson";
 import "./Home.css";
 
@@ -42,11 +43,13 @@ export default function Home() {
     refreshLessons,
     refreshProgress,
   } = useLessonStore();
+  const { lessonCompletionById, loadLessonProgress } = useProgressStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadLessons();
-  }, [loadLessons]);
+    loadLessonProgress();
+  }, [loadLessons, loadLessonProgress]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -62,7 +65,13 @@ export default function Home() {
   if (isLoading && lessons.length === 0) return <p>Loading lessons...</p>;
   if (error) return <p role="alert">Error: {error}</p>;
 
-  const visibleLessons = getLessonsByLevel(levelFilter);
+  // Stable sort: keeps the store's order within each group, just pushes finished
+  // lessons (100% of segments attempted) after unfinished/not-yet-started ones.
+  const visibleLessons = [...getLessonsByLevel(levelFilter)].sort((a, b) => {
+    const aDone = (lessonCompletionById[a.id] ?? 0) >= 1 ? 1 : 0;
+    const bDone = (lessonCompletionById[b.id] ?? 0) >= 1 ? 1 : 0;
+    return aDone - bDone;
+  });
 
   return (
     <div className="home-page">
@@ -100,20 +109,29 @@ export default function Home() {
         </Link>
       </div>
       <div className="lesson-grid">
-        {visibleLessons.map((lesson) => (
-          <Link
-            key={lesson.id}
-            to={`/practice/${lesson.id}`}
-            className={`lesson-card ${LEVEL_CARD_CLASS[lesson.level]}`}
-          >
-            <span className="lesson-icon">
-              <HeadphoneIcon />
-            </span>
-            <h3>{lesson.title}</h3>
-            <p className="lesson-card__meta">{lesson.category}</p>
-            <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
-          </Link>
-        ))}
+        {visibleLessons.map((lesson) => {
+          const pct = Math.round((lessonCompletionById[lesson.id] ?? 0) * 100);
+          const isDone = pct >= 100;
+          return (
+            <Link
+              key={lesson.id}
+              to={`/practice/${lesson.id}`}
+              className={`lesson-card ${LEVEL_CARD_CLASS[lesson.level]}${isDone ? " lesson-card--done" : ""}`}
+            >
+              <div className="lesson-card__head">
+                <span className="lesson-icon">
+                  <HeadphoneIcon />
+                </span>
+                <span className={`progress-badge${isDone ? " progress-badge--done" : ""}`}>
+                  {isDone ? "✓ 100%" : `${pct}%`}
+                </span>
+              </div>
+              <h3>{lesson.title}</h3>
+              <p className="lesson-card__meta">{lesson.category}</p>
+              <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

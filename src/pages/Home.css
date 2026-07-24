@@ -144,6 +144,14 @@
   transform: translateY(-1px) scale(0.98);
 }
 
+.lesson-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .lesson-icon {
   display: flex;
   align-items: center;
@@ -151,7 +159,29 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  margin-bottom: 10px;
+}
+
+.progress-badge {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.progress-badge--done {
+  color: var(--matcha-strong);
+  background: var(--matcha-wash);
+  border-color: transparent;
+}
+
+.lesson-card--done {
+  opacity: 0.7;
 }
 
 .lesson-icon svg {

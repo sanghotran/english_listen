@@ -13,3 +13,9 @@ export interface LevelProgress {
   lessonsCompleted: number;
   averageAccuracy: number;
 }
+
+export interface LessonProgress {
+  lessonId: string;
+  /** Fraction (0.0-1.0) of the lesson's segments with at least one recorded attempt. */
+  completion: number;
+}

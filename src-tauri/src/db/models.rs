@@ -50,3 +50,13 @@ pub struct LevelProgress {
     pub lessons_completed: i64,
     pub average_accuracy: f64,
 }
+
+/// Not a table — computed on the fly via GROUP BY over `segments` left-joined with `attempts`.
+/// `completion` is the fraction (0.0-1.0) of a lesson's segments that have at least one recorded
+/// attempt; used by the frontend to badge lesson cards and sort finished ones to the bottom.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonProgress {
+    pub lesson_id: String,
+    pub completion: f64,
+}

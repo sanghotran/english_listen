@@ -5,8 +5,10 @@ import type { Attempt, LevelProgress } from "../types/progress";
 interface ProgressStore {
   attemptsByLesson: Record<string, Attempt[]>;
   levelProgress: LevelProgress[];
+  lessonCompletionById: Record<string, number>;
   loadAttempts: (lessonId: string) => Promise<void>;
   loadLevelProgress: () => Promise<void>;
+  loadLessonProgress: () => Promise<void>;
   submitAttempt: (lessonId: string, segmentIndex: number, userTranscript: string) => Promise<Attempt>;
   getAttemptsForLesson: (lessonId: string) => Attempt[];
   getAttemptsForSegment: (lessonId: string, segmentIndex: number) => Attempt[];
@@ -15,6 +17,7 @@ interface ProgressStore {
 export const useProgressStore = create<ProgressStore>((set, get) => ({
   attemptsByLesson: {},
   levelProgress: [],
+  lessonCompletionById: {},
 
   loadAttempts: async (lessonId) => {
     const attempts = await tauriService.listAttempts(lessonId);
@@ -28,6 +31,13 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     set({ levelProgress });
   },
 
+  loadLessonProgress: async () => {
+    const rows = await tauriService.getLessonProgress();
+    const lessonCompletionById: Record<string, number> = {};
+    for (const row of rows) lessonCompletionById[row.lessonId] = row.completion;
+    set({ lessonCompletionById });
+  },
+
   // Accuracy is computed server-side by record_attempt (not trusted from the client) — see
   // src-tauri/src/commands/content.rs. The returned Attempt is the source of truth.
   submitAttempt: async (lessonId, segmentIndex, userTranscript) => {
@@ -39,6 +49,7 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
       },
     }));
     get().loadLevelProgress().catch(() => {});
+    get().loadLessonProgress().catch(() => {});
     return attempt;
   },
 

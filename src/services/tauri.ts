@@ -3,7 +3,7 @@
 // to the commands' snake_case Rust parameters by Tauri's IPC layer.
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { Lesson } from "../types/lesson";
-import type { Attempt, LevelProgress } from "../types/progress";
+import type { Attempt, LessonProgress, LevelProgress } from "../types/progress";
 import type { Segment } from "../types/segment";
 
 export interface FetchResult {
@@ -55,4 +55,8 @@ export function listAttempts(lessonId: string): Promise<Attempt[]> {
 
 export function getLevelProgress(): Promise<LevelProgress[]> {
   return invoke("get_level_progress");
+}
+
+export function getLessonProgress(): Promise<LessonProgress[]> {
+  return invoke("get_lesson_progress");
 }
