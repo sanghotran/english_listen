@@ -3,7 +3,6 @@ pub mod models;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use std::path::PathBuf;
 use std::str::FromStr;
-use tauri::{AppHandle, Manager};
 
 /// Connects to the given SQLite database URL and runs all pending migrations.
 pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
@@ -13,18 +12,31 @@ pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     Ok(pool)
 }
 
-/// Resolves the app's data directory, ensures the `audio/` cache dir exists alongside it,
-/// and opens (creating if needed) `english_listen.db` there.
-pub async fn init_pool(app: &AppHandle) -> Result<SqlitePool, sqlx::Error> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .expect("failed to resolve app data dir");
-    std::fs::create_dir_all(&data_dir).expect("failed to create app data dir");
+/// Directory the app stores its data in: the folder containing the running executable
+/// (portable install — data travels with the `.exe`, not the OS's per-user app data dir).
+///
+/// Note: `tauri::path::PathResolver::executable_dir` is NOT usable for this — on Windows it
+/// resolves via the `dirs` crate, which returns `None` there (it's meant for a user's installed
+/// binaries dir, e.g. `~/.local/bin` on Linux). We use `std::env::current_exe()` directly instead.
+pub fn portable_data_dir() -> std::io::Result<PathBuf> {
+    let exe = std::env::current_exe()?;
+    Ok(exe
+        .parent()
+        .expect("executable path must have a parent directory")
+        .to_path_buf())
+}
+
+/// Ensures the `audio/` cache dir exists next to the executable, and opens (creating if needed)
+/// `english_listen.db` there. Returns the resolved data dir so callers can register it with the
+/// asset protocol scope.
+pub async fn init_pool() -> Result<(SqlitePool, PathBuf), sqlx::Error> {
+    let data_dir = portable_data_dir().expect("failed to resolve executable directory");
+    std::fs::create_dir_all(&data_dir).expect("failed to create data dir");
     std::fs::create_dir_all(data_dir.join("audio")).expect("failed to create audio cache dir");
 
     let db_path: PathBuf = data_dir.join("english_listen.db");
-    connect(&format!("sqlite://{}", db_path.display())).await
+    let pool = connect(&format!("sqlite://{}", db_path.display())).await?;
+    Ok((pool, data_dir))
 }
 
 #[cfg(test)]

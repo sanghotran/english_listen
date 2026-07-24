@@ -1,15 +1,15 @@
+use crate::db;
 use crate::error::AppError;
 use crate::scraper::CHROME_USER_AGENT;
 use futures_util::StreamExt;
 use sqlx::SqlitePool;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 use tokio::io::AsyncWriteExt;
 
-/// Streams the lesson's mp3 to `{app_data_dir}/audio/{lesson_id}.mp3` and records the local
+/// Streams the lesson's mp3 to `{exe_dir}/audio/{lesson_id}.mp3` and records the local
 /// path — the frontend never opens the VOA URL directly in the webview (see `get_lesson_audio_path`).
 #[tauri::command]
 pub async fn download_audio(
-    app: AppHandle,
     pool: State<'_, SqlitePool>,
     lesson_id: String,
 ) -> Result<(), AppError> {
@@ -20,10 +20,7 @@ pub async fn download_audio(
     let (audio_url,) =
         audio_url.ok_or_else(|| AppError::NotFound(format!("lesson '{lesson_id}' not found")))?;
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Database(e.to_string()))?;
+    let data_dir = db::portable_data_dir()?;
     let audio_dir = data_dir.join("audio");
     tokio::fs::create_dir_all(&audio_dir).await?;
     let file_path = audio_dir.join(format!("{lesson_id}.mp3"));

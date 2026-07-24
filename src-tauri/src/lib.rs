@@ -10,9 +10,13 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let handle = app.handle().clone();
-            let pool = tauri::async_runtime::block_on(db::init_pool(&handle))?;
+            let (pool, data_dir) = tauri::async_runtime::block_on(db::init_pool())?;
             app.manage(pool);
+            // Audio files are cached at {exe_dir}/audio — allow that exact runtime-resolved
+            // path since it can't be expressed as a static glob in tauri.conf.json (there is
+            // no "next to the exe" path variable; see db::portable_data_dir).
+            app.asset_protocol_scope()
+                .allow_directory(data_dir.join("audio"), false)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
