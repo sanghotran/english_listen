@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as tauriService from "../services/tauri";
 import type { CefrLevel, Lesson } from "../types/lesson";
+import { errorMessage } from "../utils/error";
 
 interface LessonStore {
   lessons: Lesson[];
@@ -30,7 +31,8 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
       const lessons = await tauriService.listLessons();
       set({ lessons, isLoading: false });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err), isLoading: false });
+      console.error("loadLessons failed", err);
+      set({ error: errorMessage(err), isLoading: false });
     }
   },
 
@@ -42,7 +44,8 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
       set({ lessons, isLoading: false });
       return result.new;
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err), isLoading: false });
+      console.error("refreshFromVoa failed", err);
+      set({ error: errorMessage(err), isLoading: false });
       throw err;
     }
   },

@@ -7,6 +7,7 @@ import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
+import { errorMessage } from "../utils/error";
 import "./Practice.css";
 
 export default function Practice() {
@@ -39,7 +40,8 @@ export default function Practice() {
         if (!cancelled) setAudioSrc(src);
       })
       .catch((err) => {
-        if (!cancelled) setAudioError(err instanceof Error ? err.message : String(err));
+        console.error("audio download failed", err);
+        if (!cancelled) setAudioError(errorMessage(err));
       });
     return () => {
       cancelled = true;

@@ -6,8 +6,19 @@ use sqlx::SqlitePool;
 use tauri::State;
 use tokio::io::AsyncWriteExt;
 
-/// Streams the lesson's mp3 to `{exe_dir}/audio/{lesson_id}.mp3` and records the local
-/// path — the frontend never opens the VOA URL directly in the webview (see `get_lesson_audio_path`).
+/// `lesson_id` is the VOA article URL (see `fetch_new_lessons`), not filesystem-safe on its
+/// own — it embeds `/` and `:`, which `Path::join` would read as nested (non-existent)
+/// directories. Collapse it down to a flat, safe filename.
+fn safe_filename(lesson_id: &str) -> String {
+    lesson_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+/// Streams the lesson's mp3 to `{exe_dir}/audio/{safe_filename(lesson_id)}.mp3` and records
+/// the local path — the frontend never opens the VOA URL directly in the webview (see
+/// `get_lesson_audio_path`).
 #[tauri::command]
 pub async fn download_audio(
     pool: State<'_, SqlitePool>,
@@ -23,7 +34,7 @@ pub async fn download_audio(
     let data_dir = db::portable_data_dir()?;
     let audio_dir = data_dir.join("audio");
     tokio::fs::create_dir_all(&audio_dir).await?;
-    let file_path = audio_dir.join(format!("{lesson_id}.mp3"));
+    let file_path = audio_dir.join(format!("{}.mp3", safe_filename(&lesson_id)));
 
     let response = reqwest::Client::new()
         .get(&audio_url)
