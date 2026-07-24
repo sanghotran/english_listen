@@ -11,6 +11,7 @@ const LEVEL_CLASS: Record<CefrLevel, string> = {
   A1: "level-pill--a1",
   A2: "level-pill--a2",
   B1: "level-pill--b1",
+  B2: "level-pill--b2",
 };
 
 export default function ProgressTracker({ level, attemptCount, bestAccuracy }: ProgressTrackerProps) {

@@ -6,9 +6,9 @@ use sqlx::SqlitePool;
 use tauri::State;
 use tokio::io::AsyncWriteExt;
 
-/// `lesson_id` is dailydictation.com's numeric lesson id (a plain string, e.g. "399") — this is
-/// just a defensive flattening in case that ever stops holding, so a stray `/` or `:` can't be
-/// read by `Path::join` as a nested (non-existent) directory.
+/// `lesson_id` is a source's lesson id (e.g. dailydictation's numeric "399", or "ted-<slug>") —
+/// this is just a defensive flattening so a stray `/` or `:` can't be read by `Path::join` as a
+/// nested (non-existent) directory.
 fn safe_filename(lesson_id: &str) -> String {
     lesson_id
         .chars()
@@ -16,7 +16,19 @@ fn safe_filename(lesson_id: &str) -> String {
         .collect()
 }
 
-/// Streams the lesson's mp3 to `{exe_dir}/audio/{safe_filename(lesson_id)}.mp3` and records
+/// The audio file's extension, taken from its URL — dailydictation serves mp3, TED serves
+/// progressive mp4 (see scraper::ted). Falls back to "mp3" if the URL's last path segment has no
+/// dot, rather than guessing wrong; every source seen so far has a real extension in its URL.
+fn audio_extension(audio_url: &str) -> &str {
+    let path = audio_url.split(['?', '#']).next().unwrap_or(audio_url);
+    path.rsplit('/')
+        .next()
+        .and_then(|last_segment| last_segment.rsplit_once('.'))
+        .map(|(_, ext)| ext)
+        .unwrap_or("mp3")
+}
+
+/// Streams the lesson's audio to `{exe_dir}/audio/{safe_filename(lesson_id)}.{ext}` and records
 /// the local path — the frontend never opens the source URL directly in the webview (see
 /// `get_lesson_audio_path`).
 #[tauri::command]
@@ -34,7 +46,8 @@ pub async fn download_audio(
     let data_dir = db::portable_data_dir()?;
     let audio_dir = data_dir.join("audio");
     tokio::fs::create_dir_all(&audio_dir).await?;
-    let file_path = audio_dir.join(format!("{}.mp3", safe_filename(&lesson_id)));
+    let ext = audio_extension(&audio_url);
+    let file_path = audio_dir.join(format!("{}.{}", safe_filename(&lesson_id), ext));
 
     let response = reqwest::Client::new()
         .get(&audio_url)
@@ -74,5 +87,38 @@ pub async fn get_lesson_audio_path(
     match row {
         Some((path,)) => Ok(path),
         None => Err(AppError::NotFound(format!("lesson '{lesson_id}' not found"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audio_extension_reads_dailydictation_mp3() {
+        assert_eq!(
+            audio_extension("https://dailydictation.com/upload/audio/1-at-home.mp3"),
+            "mp3"
+        );
+    }
+
+    #[test]
+    fn audio_extension_reads_ted_mp4() {
+        assert_eq!(
+            audio_extension(
+                "https://py.tedcdn.com/consus/projects/00/08/98/007/products/2008-helen-fisher-007-fallback-12d69c8803a25b830a2c29904f64693b-1200k.mp4"
+            ),
+            "mp4"
+        );
+    }
+
+    #[test]
+    fn audio_extension_ignores_query_string() {
+        assert_eq!(audio_extension("https://example.com/audio.mp4?token=abc"), "mp4");
+    }
+
+    #[test]
+    fn audio_extension_falls_back_to_mp3_without_a_dot() {
+        assert_eq!(audio_extension("https://example.com/audio"), "mp3");
     }
 }

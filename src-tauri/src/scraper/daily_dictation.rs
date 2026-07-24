@@ -12,16 +12,10 @@
 //! so it's a hand-picked mapping based on eyeballing real sentences from each category.
 
 use crate::error::AppError;
-use crate::scraper::CHROME_USER_AGENT;
+use crate::scraper::{get_text_with_retry, Category, ScrapedLesson, ScrapedSegment};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Category {
-    pub slug: &'static str,
-    pub level: &'static str,
-}
 
 pub const CATEGORIES: &[Category] = &[
     // "0 to 10", "counting by 5s" — simplest content on the site.
@@ -55,24 +49,6 @@ struct AppGlobals {
     challenges: Vec<Challenge>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ScrapedSegment {
-    /// 0-based, matching this app's existing `attempts.segment_index` convention.
-    pub position: i64,
-    pub content: String,
-    pub time_start: f64,
-    pub time_end: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct ScrapedLesson {
-    pub id: String,
-    pub title: String,
-    pub audio_url: String,
-    pub page_url: String,
-    pub segments: Vec<ScrapedSegment>,
-}
-
 static LOC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<loc>([^<]+)</loc>").unwrap());
 // `(?s)` so `.` also matches newlines, in case the blob is ever pretty-printed across lines —
 // on the real page it's a single line, but this is cheap insurance against that changing.
@@ -87,43 +63,10 @@ pub fn lesson_id_from_url(url: &str) -> Option<String> {
     LESSON_ID_IN_URL_RE.captures(url).map(|c| c[1].to_string())
 }
 
-const MAX_RATE_LIMIT_RETRIES: u32 = 5;
-const DEFAULT_RETRY_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
-
 /// Delay `fetch_new_lessons` should sleep between exercise page fetches. Confirmed by hand:
 /// hammering real exercise URLs back-to-back with no delay gets rate-limited (HTTP 429) after
 /// ~50-55 requests, while 200-350ms of spacing ran 40-50 requests straight through with none.
 pub const REQUEST_PACING: std::time::Duration = std::time::Duration::from_millis(300);
-
-/// GETs `url` as text, retrying on HTTP 429 (confirmed by hand: dailydictation.com's Cloudflare
-/// front end starts rate-limiting a sequential scraper after roughly 50-55 requests with no
-/// delay between them) — honors `Retry-After` when the response sends one, otherwise backs off
-/// a flat few seconds. `fetch_new_lessons` also paces requests between calls so this should
-/// rarely trigger, but a lesson shouldn't be silently dropped just because of a transient 429.
-async fn get_text_with_retry(client: &reqwest::Client, url: &str) -> Result<String, AppError> {
-    for attempt in 0..=MAX_RATE_LIMIT_RETRIES {
-        let response = client
-            .get(url)
-            .header("User-Agent", CHROME_USER_AGENT)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RATE_LIMIT_RETRIES {
-            let wait = response
-                .headers()
-                .get(reqwest::header::RETRY_AFTER)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u64>().ok())
-                .map(std::time::Duration::from_secs)
-                .unwrap_or(DEFAULT_RETRY_AFTER);
-            tokio::time::sleep(wait).await;
-            continue;
-        }
-
-        return Ok(response.error_for_status()?.text().await?);
-    }
-    unreachable!("loop always returns on its last iteration (attempt == MAX_RATE_LIMIT_RETRIES)")
-}
 
 /// Lists every exercise URL in a category via its sitemap (not the paginated HTML browse page —
 /// the sitemap gives the full catalog in one request).

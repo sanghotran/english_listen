@@ -10,6 +10,7 @@ const RING_COLOR: Record<CefrLevel, string> = {
   A1: "var(--matcha)",
   A2: "var(--yolk)",
   B1: "var(--taro)",
+  B2: "var(--cocoa)",
 };
 
 export default function Progress() {

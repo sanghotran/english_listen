@@ -10,12 +10,14 @@ const LEVEL_CLASS: Record<CefrLevel, string> = {
   A1: "level-pill--a1",
   A2: "level-pill--a2",
   B1: "level-pill--b1",
+  B2: "level-pill--b2",
 };
 
 const LEVEL_CARD_CLASS: Record<CefrLevel, string> = {
   A1: "lesson-card--a1",
   A2: "lesson-card--a2",
   B1: "lesson-card--b1",
+  B2: "lesson-card--b2",
 };
 
 function HeadphoneIcon() {

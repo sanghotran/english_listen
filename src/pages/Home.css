@@ -174,6 +174,11 @@
   color: var(--taro-strong);
 }
 
+.lesson-card--b2 .lesson-icon {
+  background: var(--cocoa-wash);
+  color: var(--cocoa-strong);
+}
+
 .lesson-card h3 {
   font-size: 16px;
   font-family: var(--font-body);

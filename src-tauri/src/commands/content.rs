@@ -1,7 +1,7 @@
 use crate::db::models::{Attempt, Lesson, LevelProgress, Segment};
 use crate::diff::{self, WordStatus};
 use crate::error::AppError;
-use crate::scraper::daily_dictation::{self, Category};
+use crate::scraper::{daily_dictation, ted, Category, ScrapedLesson};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use tauri::{AppHandle, Emitter, State};
@@ -62,36 +62,15 @@ struct RefreshProgress {
     category: &'static str,
 }
 
-/// Inserts one exercise URL's lesson + segments if it's genuinely new. Returns `Ok(false)`
-/// (not an error) for lessons already known, ones with no downloadable audio (YouTube-embedded
-/// categories), or a fetch/parse failure — same "skip, don't fail the whole refresh" policy the
-/// old VOA ingestion used. A `?`-propagated `Err` here means a real DB failure, which should
-/// abort the refresh rather than be silently skipped.
-async fn ingest_exercise_url(
+/// Inserts one already-fetched lesson + its segments. Shared by every source's ingestion
+/// function below — the sources differ in how a `ScrapedLesson` is obtained, not in how it's
+/// persisted. A `?`-propagated `Err` here means a real DB failure, which should abort the
+/// refresh rather than be silently skipped.
+async fn insert_scraped_lesson(
     pool: &SqlitePool,
-    client: &reqwest::Client,
+    lesson: &ScrapedLesson,
     category: &Category,
-    url: &str,
-    existing_ids: &std::collections::HashSet<String>,
-) -> Result<bool, AppError> {
-    if let Some(id) = daily_dictation::lesson_id_from_url(url) {
-        if existing_ids.contains(&id) {
-            return Ok(false);
-        }
-    }
-
-    // Paced to stay under dailydictation.com's rate limit — see REQUEST_PACING.
-    tokio::time::sleep(daily_dictation::REQUEST_PACING).await;
-
-    let lesson = match daily_dictation::fetch_exercise(client, url).await {
-        Ok(Some(lesson)) => lesson,
-        Ok(None) | Err(_) => return Ok(false),
-    };
-
-    if existing_ids.contains(&lesson.id) {
-        return Ok(false);
-    }
-
+) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO lessons (id, title, level, category, audio_url, page_url, published_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -120,14 +99,79 @@ async fn ingest_exercise_url(
         .await?;
     }
 
+    Ok(())
+}
+
+/// Inserts one dailydictation.com exercise URL's lesson + segments if it's genuinely new.
+/// Returns `Ok(false)` (not an error) for lessons already known, ones with no downloadable audio
+/// (YouTube-embedded categories), or a fetch/parse failure — same "skip, don't fail the whole
+/// refresh" policy the old VOA ingestion used.
+async fn ingest_daily_dictation_url(
+    pool: &SqlitePool,
+    client: &reqwest::Client,
+    category: &Category,
+    url: &str,
+    existing_ids: &std::collections::HashSet<String>,
+) -> Result<bool, AppError> {
+    if let Some(id) = daily_dictation::lesson_id_from_url(url) {
+        if existing_ids.contains(&id) {
+            return Ok(false);
+        }
+    }
+
+    // Paced to stay under dailydictation.com's rate limit — see REQUEST_PACING.
+    tokio::time::sleep(daily_dictation::REQUEST_PACING).await;
+
+    let lesson = match daily_dictation::fetch_exercise(client, url).await {
+        Ok(Some(lesson)) => lesson,
+        Ok(None) | Err(_) => return Ok(false),
+    };
+
+    if existing_ids.contains(&lesson.id) {
+        return Ok(false);
+    }
+
+    insert_scraped_lesson(pool, &lesson, category).await?;
     Ok(true)
 }
 
-/// Walks each configured dailydictation.com category's sitemap and ingests exercises this DB
-/// doesn't have yet. Unlike the old VOA RSS ingestion (which always re-fetched every episode
-/// page to check for updates), a lesson id already in the DB is skipped without even fetching
-/// its page — dailydictation content doesn't change post-publish, and re-fetching all ~1000+
-/// pages on every refresh click would make "Refresh" unusably slow after the first run.
+/// Inserts one ted.com talk URL's lesson + segments if it's genuinely new. Same skip policy as
+/// `ingest_daily_dictation_url` — additionally skips non-English talks (see `ted::extract_lesson`).
+async fn ingest_ted_url(
+    pool: &SqlitePool,
+    client: &reqwest::Client,
+    category: &Category,
+    url: &str,
+    existing_ids: &std::collections::HashSet<String>,
+) -> Result<bool, AppError> {
+    if let Some(id) = ted::lesson_id_from_url(url) {
+        if existing_ids.contains(&id) {
+            return Ok(false);
+        }
+    }
+
+    // Paced to stay under ted.com's (untested) rate limit — see ted::REQUEST_PACING.
+    tokio::time::sleep(ted::REQUEST_PACING).await;
+
+    let lesson = match ted::fetch_talk(client, url).await {
+        Ok(Some(lesson)) => lesson,
+        Ok(None) | Err(_) => return Ok(false),
+    };
+
+    if existing_ids.contains(&lesson.id) {
+        return Ok(false);
+    }
+
+    insert_scraped_lesson(pool, &lesson, category).await?;
+    Ok(true)
+}
+
+/// Walks each configured dailydictation.com category's sitemap plus TED's yearly sitemaps, and
+/// ingests exercises/talks this DB doesn't have yet. Unlike the old VOA RSS ingestion (which
+/// always re-fetched every episode page to check for updates), a lesson id already in the DB is
+/// skipped without even fetching its page — neither source changes content post-publish, and
+/// re-fetching everything on every refresh click would make "Refresh" unusably slow after the
+/// first run.
 #[tauri::command]
 pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>, app: AppHandle) -> Result<FetchResult, AppError> {
     let client = reqwest::Client::new();
@@ -139,23 +183,33 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>, app: AppHandle) -> R
         .collect();
 
     // Discover every URL up front so progress can report a real total instead of one that
-    // grows as categories are processed.
-    let mut category_urls: Vec<(&Category, Vec<String>)> = Vec::new();
+    // grows as categories/sitemaps are processed.
+    let mut dd_category_urls: Vec<(&Category, Vec<String>)> = Vec::new();
     for category in daily_dictation::CATEGORIES {
         if let Ok(urls) = daily_dictation::fetch_category_urls(&client, category.slug).await {
-            category_urls.push((category, urls));
+            dd_category_urls.push((category, urls));
         }
         // One unreachable category sitemap shouldn't abort the whole refresh — it's just
-        // absent from category_urls, contributing 0 to the total.
+        // absent from dd_category_urls, contributing 0 to the total.
     }
-    let total: u32 = category_urls.iter().map(|(_, urls)| urls.len() as u32).sum();
+
+    let mut ted_urls: Vec<String> = Vec::new();
+    for sitemap_url in ted::TALK_SITEMAPS {
+        if let Ok(urls) = ted::fetch_sitemap_urls(&client, sitemap_url).await {
+            ted_urls.extend(urls);
+        }
+        // Same policy: one unreachable yearly sitemap shouldn't abort the whole refresh.
+    }
+
+    let total: u32 = dd_category_urls.iter().map(|(_, urls)| urls.len() as u32).sum::<u32>()
+        + ted_urls.len() as u32;
 
     let mut processed: u32 = 0;
     let mut new_count: u32 = 0;
 
-    for (category, urls) in category_urls {
+    for (category, urls) in dd_category_urls {
         for url in &urls {
-            let is_new = ingest_exercise_url(pool.inner(), &client, category, url, &existing_ids).await?;
+            let is_new = ingest_daily_dictation_url(pool.inner(), &client, category, url, &existing_ids).await?;
             processed += 1;
             if is_new {
                 new_count += 1;
@@ -166,6 +220,18 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>, app: AppHandle) -> R
                 RefreshProgress { processed, total, new_count, category: category.slug },
             );
         }
+    }
+
+    for url in &ted_urls {
+        let is_new = ingest_ted_url(pool.inner(), &client, &ted::CATEGORY, url, &existing_ids).await?;
+        processed += 1;
+        if is_new {
+            new_count += 1;
+        }
+        let _ = app.emit(
+            "lessons-refresh-progress",
+            RefreshProgress { processed, total, new_count, category: ted::CATEGORY.slug },
+        );
     }
 
     Ok(FetchResult { new: new_count })

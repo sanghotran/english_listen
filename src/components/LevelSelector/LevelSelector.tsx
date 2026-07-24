@@ -3,13 +3,14 @@ import "./LevelSelector.css";
 
 export type LevelFilter = CefrLevel | "ALL";
 
-const LEVELS: LevelFilter[] = ["ALL", "A1", "A2", "B1"];
+const LEVELS: LevelFilter[] = ["ALL", "A1", "A2", "B1", "B2"];
 
 const LEVEL_MODIFIER: Record<LevelFilter, string> = {
   ALL: "level-selector__btn--all",
   A1: "level-selector__btn--a1",
   A2: "level-selector__btn--a2",
   B1: "level-selector__btn--b1",
+  B2: "level-selector__btn--b2",
 };
 
 interface LevelSelectorProps {

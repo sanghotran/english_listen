@@ -46,6 +46,10 @@
   --taro-strong: #9575C4;
   --taro-wash: #ECE3F9;
 
+  --cocoa: #B08463;
+  --cocoa-strong: #8F6748;
+  --cocoa-wash: #F1E4D8;
+
   --miss: #FF8477;
   --miss-strong: #E56555;
   --miss-wash: #FFE4E0;
@@ -89,6 +93,10 @@
     --taro: #C7ACEE;
     --taro-strong: #D6C0F4;
     --taro-wash: #33274A;
+
+    --cocoa: #D9A97D;
+    --cocoa-strong: #E8C39C;
+    --cocoa-wash: #3A2A20;
 
     --miss: #FF9C90;
     --miss-strong: #FFB3A8;
@@ -229,6 +237,11 @@ button {
 .level-pill--b1 {
   background: var(--taro-wash);
   color: var(--taro-strong);
+}
+
+.level-pill--b2 {
+  background: var(--cocoa-wash);
+  color: var(--cocoa-strong);
 }
 
 /* Shared card surface */
