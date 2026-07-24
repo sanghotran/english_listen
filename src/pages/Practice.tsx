@@ -10,7 +10,10 @@ import { useProgressStore } from "../store/progressStore";
 import "./Practice.css";
 
 export default function Practice() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { lessonId: rawLessonId } = useParams<{ lessonId: string }>();
+  // Lesson ids are VOA article URLs (see fetch_new_lessons), so Home encodes them for the
+  // route and we decode back here — the raw URL contains slashes that break route matching.
+  const lessonId = rawLessonId ? decodeURIComponent(rawLessonId) : undefined;
   const { lessons, loadLessons, getLessonById, ensureAudioDownloaded } = useLessonStore();
   const { submitAttempt, getAttemptsForLesson, loadAttempts } = useProgressStore();
   const [audioSrc, setAudioSrc] = useState<string | null>(null);

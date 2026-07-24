@@ -48,7 +48,7 @@ export default function Home() {
       <LevelSelector value={levelFilter} onChange={setLevelFilter} />
       <div className="lesson-grid">
         {visibleLessons.map((lesson) => (
-          <Link key={lesson.id} to={`/practice/${lesson.id}`} className="lesson-card">
+          <Link key={lesson.id} to={`/practice/${encodeURIComponent(lesson.id)}`} className="lesson-card">
             <span className={`level-pill ${LEVEL_CLASS[lesson.level]}`}>{lesson.level}</span>
             <h3>{lesson.title}</h3>
             <p className="lesson-card__meta">{lesson.sourceShow}</p>
