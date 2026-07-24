@@ -38,3 +38,21 @@ export function segmentTranscript(transcript: string, level: CefrLevel): string[
   }
   return segments;
 }
+
+/** VOA gives no per-sentence audio timestamps, so a segment's slice of the audio track is
+ * approximated by its share of the transcript's total word count (assumes a roughly constant
+ * speaking rate — not exact, but close enough to let a single segment be looped for dictation
+ * instead of the whole ~5 minute file). Returned fractions feed useAudioPlayer's `bounds`. */
+export function segmentAudioBounds(
+  segments: string[],
+  index: number,
+): { startFraction: number; endFraction: number } {
+  const wordCounts = segments.map((s) => s.split(/\s+/).filter(Boolean).length);
+  const totalWords = wordCounts.reduce((sum, n) => sum + n, 0) || 1;
+  const wordsBefore = wordCounts.slice(0, index).reduce((sum, n) => sum + n, 0);
+  const wordsInSegment = wordCounts[index] ?? 0;
+  return {
+    startFraction: wordsBefore / totalWords,
+    endFraction: (wordsBefore + wordsInSegment) / totalWords,
+  };
+}

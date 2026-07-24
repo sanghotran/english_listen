@@ -8,7 +8,7 @@ import { useDictationSession } from "../hooks/useDictationSession";
 import { useLessonStore } from "../store/lessonStore";
 import { useProgressStore } from "../store/progressStore";
 import { errorMessage } from "../utils/error";
-import { segmentTranscript } from "../utils/segments";
+import { segmentAudioBounds, segmentTranscript } from "../utils/segments";
 import "./Practice.css";
 
 export default function Practice() {
@@ -35,6 +35,10 @@ export default function Practice() {
   // A full ~5 minute transcript is too much to dictate in one pass, so it's split into a few
   // sentences at a time (more per segment at higher levels — see utils/segments.ts).
   const segments = useMemo(() => (lesson ? segmentTranscript(lesson.transcript, lesson.level) : []), [lesson]);
+
+  // No per-sentence timestamps from VOA, so the audio window for the current segment is
+  // approximated proportionally by word count (see utils/segments.ts) rather than split files.
+  const audioBounds = useMemo(() => segmentAudioBounds(segments, segmentIndex), [segments, segmentIndex]);
 
   useEffect(() => {
     setSegmentIndex(0);
@@ -85,7 +89,11 @@ export default function Practice() {
       <h1>{lesson.title}</h1>
       <ProgressTracker level={lesson.level} attemptCount={segmentAttempts.length} bestAccuracy={bestAccuracy} />
       {audioError && <p role="alert">Audio unavailable: {audioError}</p>}
-      {audioSrc ? <AudioPlayer src={audioSrc} /> : !audioError && <p className="practice-page__status">Downloading audio…</p>}
+      {audioSrc ? (
+        <AudioPlayer src={audioSrc} bounds={audioBounds} />
+      ) : (
+        !audioError && <p className="practice-page__status">Downloading audio…</p>
+      )}
 
       <div className="segment-nav">
         <button

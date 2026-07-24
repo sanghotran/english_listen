@@ -1,8 +1,11 @@
-import { useAudioPlayer } from "../../hooks/useAudioPlayer";
+import { type AudioSegmentBounds, useAudioPlayer } from "../../hooks/useAudioPlayer";
 import "./AudioPlayer.css";
 
 interface AudioPlayerProps {
   src: string;
+  /** Clamps playback to this fraction-of-duration window (see useAudioPlayer). Omit to play
+   * the whole track. */
+  bounds?: AudioSegmentBounds;
 }
 
 const RATES = [0.75, 1, 1.25];
@@ -14,9 +17,22 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function AudioPlayer({ src }: AudioPlayerProps) {
-  const { audioRef, isPlaying, currentTime, duration, playbackRate, toggle, replayFromStart, seekTo, setPlaybackRate } =
-    useAudioPlayer(src);
+export default function AudioPlayer({ src, bounds }: AudioPlayerProps) {
+  const {
+    audioRef,
+    isPlaying,
+    currentTime,
+    startTime,
+    endTime,
+    playbackRate,
+    toggle,
+    replayFromStart,
+    seekTo,
+    setPlaybackRate,
+  } = useAudioPlayer(src, bounds);
+
+  const elapsed = Math.max(0, currentTime - startTime);
+  const segmentDuration = Math.max(0, endTime - startTime);
 
   return (
     <div className="audio-player">
@@ -25,7 +41,7 @@ export default function AudioPlayer({ src }: AudioPlayerProps) {
         <button type="button" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
           {isPlaying ? "⏸" : "▶"}
         </button>
-        <button type="button" onClick={replayFromStart} aria-label="Replay from start">
+        <button type="button" onClick={replayFromStart} aria-label="Replay segment">
           ⏮ Replay
         </button>
         <select
@@ -41,16 +57,16 @@ export default function AudioPlayer({ src }: AudioPlayerProps) {
         </select>
       </div>
       <div className="audio-player__timeline">
-        <span>{formatTime(currentTime)}</span>
+        <span>{formatTime(elapsed)}</span>
         <input
           type="range"
-          min={0}
-          max={duration || 0}
+          min={startTime}
+          max={endTime || startTime}
           step={0.1}
           value={currentTime}
           onChange={(e) => seekTo(Number(e.target.value))}
         />
-        <span>{formatTime(duration)}</span>
+        <span>{formatTime(segmentDuration)}</span>
       </div>
     </div>
   );

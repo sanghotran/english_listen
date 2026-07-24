@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { segmentTranscript, splitSentences } from "./segments";
+import { segmentAudioBounds, segmentTranscript, splitSentences } from "./segments";
 
 describe("splitSentences", () => {
   it("splits on sentence terminators", () => {
@@ -30,5 +30,24 @@ describe("segmentTranscript", () => {
 
   it("returns no segments for empty input", () => {
     expect(segmentTranscript("", "B1")).toEqual([]);
+  });
+});
+
+describe("segmentAudioBounds", () => {
+  it("splits proportionally by word count across equal-length segments", () => {
+    const segments = ["one two", "three four", "five six"];
+    expect(segmentAudioBounds(segments, 0)).toEqual({ startFraction: 0, endFraction: 1 / 3 });
+    expect(segmentAudioBounds(segments, 1)).toEqual({ startFraction: 1 / 3, endFraction: 2 / 3 });
+    expect(segmentAudioBounds(segments, 2)).toEqual({ startFraction: 2 / 3, endFraction: 1 });
+  });
+
+  it("weighs longer segments with a proportionally larger fraction", () => {
+    const segments = ["one two three", "four"];
+    expect(segmentAudioBounds(segments, 0)).toEqual({ startFraction: 0, endFraction: 0.75 });
+    expect(segmentAudioBounds(segments, 1)).toEqual({ startFraction: 0.75, endFraction: 1 });
+  });
+
+  it("does not divide by zero for an empty segment list", () => {
+    expect(segmentAudioBounds([], 0)).toEqual({ startFraction: 0, endFraction: 0 });
   });
 });
