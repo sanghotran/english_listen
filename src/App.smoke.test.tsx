@@ -44,6 +44,8 @@ vi.mock("@tauri-apps/api/core", () => ({
         return [];
       case "get_level_progress":
         return [];
+      case "get_lesson_progress":
+        return [];
       default:
         throw new Error(`unmocked tauri command: ${cmd}`);
     }
@@ -53,7 +55,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 beforeEach(() => {
   useLessonStore.setState({ lessons: [], levelFilter: "ALL", isLoading: false, error: null, segmentsByLesson: {} });
-  useProgressStore.setState({ attemptsByLesson: {}, levelProgress: [] });
+  useProgressStore.setState({ attemptsByLesson: {}, levelProgress: [], lessonCompletionById: {} });
   window.history.pushState({}, "", "/");
 });
 
