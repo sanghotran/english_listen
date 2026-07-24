@@ -1,0 +1,25 @@
+.error-boundary {
+  max-width: 480px;
+  margin: 15vh auto 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.error-boundary h1 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--error);
+  margin: 0 0 10px;
+}
+
+.error-boundary p {
+  margin: 0 0 8px;
+  color: var(--ink-muted);
+}
+
+.error-boundary__hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+}

@@ -29,6 +29,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::content::log_frontend_error,
             commands::content::list_lessons,
             commands::content::get_lesson,
             commands::content::fetch_new_lessons,

@@ -13,6 +13,13 @@ async fn fetch_lesson(pool: &SqlitePool, id: &str) -> Result<Lesson, AppError> {
         .ok_or_else(|| AppError::NotFound(format!("lesson '{id}' not found")))
 }
 
+/// Lets the frontend forward uncaught render errors (see `ErrorBoundary`) into the same
+/// file log Rust panics go to — otherwise a blank-page JS crash leaves zero trace anywhere.
+#[tauri::command]
+pub fn log_frontend_error(message: String) {
+    crate::logging::append(&format!("FRONTEND ERROR: {message}"));
+}
+
 #[tauri::command]
 pub async fn list_lessons(pool: State<'_, SqlitePool>) -> Result<Vec<Lesson>, AppError> {
     let lessons = sqlx::query_as::<_, Lesson>("SELECT * FROM lessons ORDER BY published_at DESC")
