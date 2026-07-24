@@ -20,7 +20,7 @@
 //! transcript in a useful way for dictation.
 
 use crate::error::AppError;
-use crate::scraper::{get_text_with_retry, Category, ScrapedLesson, ScrapedSegment};
+use crate::scraper::{get_text_with_retry, Category, ScrapedLesson, ScrapedSegment, CHROME_USER_AGENT};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
@@ -150,12 +150,38 @@ pub fn parse_sitemap_urls(xml: &str) -> Vec<String> {
 }
 
 /// Fetches one talk's transcript page and extracts its lesson + segments. Returns `None` (not an
-/// error) for non-English talks or malformed pages — same "skip, don't fail the whole refresh"
-/// policy `daily_dictation::fetch_exercise` uses.
+/// error) for non-English talks, malformed pages, or a talk whose audio isn't actually reachable
+/// (see `audio_url_is_reachable`) — same "skip, don't fail the whole refresh" policy
+/// `daily_dictation::fetch_exercise` uses.
 pub async fn fetch_talk(client: &reqwest::Client, talk_url: &str) -> Result<Option<ScrapedLesson>, AppError> {
     let transcript_url = format!("{}/transcript", talk_url.trim_end_matches('/'));
     let html = get_text_with_retry(client, &transcript_url).await?;
-    Ok(extract_lesson(&html))
+    let Some(lesson) = extract_lesson(&html) else {
+        return Ok(None);
+    };
+
+    if !audio_url_is_reachable(client, &lesson.audio_url).await {
+        return Ok(None);
+    }
+
+    Ok(Some(lesson))
+}
+
+/// `videoData.playerData.resources.h264` being present in the transcript JSON does *not* mean
+/// the file is actually downloadable — confirmed by hand on 2026-07-24 against a mix of talks:
+/// some from 2008-2012 return 200, but plenty of others (2009, and multiple from 2024/2025 —
+/// exactly the years `TALK_SITEMAPS` crawls) return 403 from ted.com's S3 bucket regardless of
+/// headers sent. There's no reliable pattern (it isn't simply "older talks are public"), so a
+/// HEAD check here is the only way to catch this before a lesson with unplayable audio gets
+/// persisted — matches this app's existing "skip rather than save something broken" policy.
+async fn audio_url_is_reachable(client: &reqwest::Client, audio_url: &str) -> bool {
+    client
+        .head(audio_url)
+        .header("User-Agent", CHROME_USER_AGENT)
+        .send()
+        .await
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
 }
 
 pub fn extract_lesson(html: &str) -> Option<ScrapedLesson> {

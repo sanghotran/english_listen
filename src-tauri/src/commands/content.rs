@@ -136,7 +136,8 @@ async fn ingest_daily_dictation_url(
 }
 
 /// Inserts one ted.com talk URL's lesson + segments if it's genuinely new. Same skip policy as
-/// `ingest_daily_dictation_url` — additionally skips non-English talks (see `ted::extract_lesson`).
+/// `ingest_daily_dictation_url` — additionally skips non-English talks and talks whose audio file
+/// turns out to be unreachable (see `ted::fetch_talk`).
 async fn ingest_ted_url(
     pool: &SqlitePool,
     client: &reqwest::Client,
