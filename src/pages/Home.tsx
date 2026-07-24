@@ -12,8 +12,17 @@ const LEVEL_CLASS: Record<CefrLevel, string> = {
 };
 
 export default function Home() {
-  const { lessons, isLoading, error, levelFilter, loadLessons, setLevelFilter, getLessonsByLevel, refreshLessons } =
-    useLessonStore();
+  const {
+    lessons,
+    isLoading,
+    error,
+    levelFilter,
+    loadLessons,
+    setLevelFilter,
+    getLessonsByLevel,
+    refreshLessons,
+    refreshProgress,
+  } = useLessonStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -45,6 +54,20 @@ export default function Home() {
           {isRefreshing ? "Refreshing…" : "Refresh lessons"}
         </button>
       </div>
+      {isRefreshing && refreshProgress && (
+        <div className="refresh-progress">
+          <div className="refresh-progress__bar">
+            <div
+              className="refresh-progress__fill"
+              style={{ width: `${refreshProgress.total > 0 ? (refreshProgress.processed / refreshProgress.total) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="refresh-progress__label">
+            {refreshProgress.category}: {refreshProgress.processed}/{refreshProgress.total} lessons checked ·{" "}
+            {refreshProgress.newCount} new
+          </p>
+        </div>
+      )}
       <LevelSelector value={levelFilter} onChange={setLevelFilter} />
       <div className="lesson-grid">
         {visibleLessons.map((lesson) => (

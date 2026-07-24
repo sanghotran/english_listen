@@ -1,9 +1,10 @@
 use crate::db::models::{Attempt, Lesson, LevelProgress, Segment};
 use crate::diff::{self, WordStatus};
 use crate::error::AppError;
+use crate::scraper::daily_dictation::{self, Category};
 use serde::Serialize;
 use sqlx::SqlitePool;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 async fn fetch_lesson(pool: &SqlitePool, id: &str) -> Result<Lesson, AppError> {
     sqlx::query_as::<_, Lesson>("SELECT * FROM lessons WHERE id = ?")
@@ -49,13 +50,86 @@ pub struct FetchResult {
     pub new: u32,
 }
 
+/// Emitted to the frontend (`lessons-refresh-progress`) after every exercise URL processed by
+/// `fetch_new_lessons`, since a full first run walks ~1000+ pages at a paced rate and can take
+/// several minutes — without this the "Refresh" button just looks stuck the whole time.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RefreshProgress {
+    processed: u32,
+    total: u32,
+    new_count: u32,
+    category: &'static str,
+}
+
+/// Inserts one exercise URL's lesson + segments if it's genuinely new. Returns `Ok(false)`
+/// (not an error) for lessons already known, ones with no downloadable audio (YouTube-embedded
+/// categories), or a fetch/parse failure — same "skip, don't fail the whole refresh" policy the
+/// old VOA ingestion used. A `?`-propagated `Err` here means a real DB failure, which should
+/// abort the refresh rather than be silently skipped.
+async fn ingest_exercise_url(
+    pool: &SqlitePool,
+    client: &reqwest::Client,
+    category: &Category,
+    url: &str,
+    existing_ids: &std::collections::HashSet<String>,
+) -> Result<bool, AppError> {
+    if let Some(id) = daily_dictation::lesson_id_from_url(url) {
+        if existing_ids.contains(&id) {
+            return Ok(false);
+        }
+    }
+
+    // Paced to stay under dailydictation.com's rate limit — see REQUEST_PACING.
+    tokio::time::sleep(daily_dictation::REQUEST_PACING).await;
+
+    let lesson = match daily_dictation::fetch_exercise(client, url).await {
+        Ok(Some(lesson)) => lesson,
+        Ok(None) | Err(_) => return Ok(false),
+    };
+
+    if existing_ids.contains(&lesson.id) {
+        return Ok(false);
+    }
+
+    sqlx::query(
+        "INSERT INTO lessons (id, title, level, category, audio_url, page_url, published_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&lesson.id)
+    .bind(&lesson.title)
+    .bind(category.level)
+    .bind(category.slug)
+    .bind(&lesson.audio_url)
+    .bind(&lesson.page_url)
+    .bind(chrono::Utc::now().to_rfc3339())
+    .execute(pool)
+    .await?;
+
+    for segment in &lesson.segments {
+        sqlx::query(
+            "INSERT INTO segments (lesson_id, position, content, time_start, time_end)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&lesson.id)
+        .bind(segment.position)
+        .bind(&segment.content)
+        .bind(segment.time_start)
+        .bind(segment.time_end)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(true)
+}
+
 /// Walks each configured dailydictation.com category's sitemap and ingests exercises this DB
 /// doesn't have yet. Unlike the old VOA RSS ingestion (which always re-fetched every episode
 /// page to check for updates), a lesson id already in the DB is skipped without even fetching
 /// its page — dailydictation content doesn't change post-publish, and re-fetching all ~1000+
 /// pages on every refresh click would make "Refresh" unusably slow after the first run.
 #[tauri::command]
-pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResult, AppError> {
+pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>, app: AppHandle) -> Result<FetchResult, AppError> {
     let client = reqwest::Client::new();
 
     let existing_ids: std::collections::HashSet<String> = sqlx::query_scalar("SELECT id FROM lessons")
@@ -64,65 +138,33 @@ pub async fn fetch_new_lessons(pool: State<'_, SqlitePool>) -> Result<FetchResul
         .into_iter()
         .collect();
 
+    // Discover every URL up front so progress can report a real total instead of one that
+    // grows as categories are processed.
+    let mut category_urls: Vec<(&Category, Vec<String>)> = Vec::new();
+    for category in daily_dictation::CATEGORIES {
+        if let Ok(urls) = daily_dictation::fetch_category_urls(&client, category.slug).await {
+            category_urls.push((category, urls));
+        }
+        // One unreachable category sitemap shouldn't abort the whole refresh — it's just
+        // absent from category_urls, contributing 0 to the total.
+    }
+    let total: u32 = category_urls.iter().map(|(_, urls)| urls.len() as u32).sum();
+
+    let mut processed: u32 = 0;
     let mut new_count: u32 = 0;
 
-    for category in crate::scraper::daily_dictation::CATEGORIES {
-        let urls = match crate::scraper::daily_dictation::fetch_category_urls(&client, category.slug).await {
-            Ok(urls) => urls,
-            // One unreachable category sitemap shouldn't abort the whole refresh.
-            Err(_) => continue,
-        };
-
-        for url in urls {
-            if let Some(id) = crate::scraper::daily_dictation::lesson_id_from_url(&url) {
-                if existing_ids.contains(&id) {
-                    continue;
-                }
+    for (category, urls) in category_urls {
+        for url in &urls {
+            let is_new = ingest_exercise_url(pool.inner(), &client, category, url, &existing_ids).await?;
+            processed += 1;
+            if is_new {
+                new_count += 1;
             }
-
-            // Paced to stay under dailydictation.com's rate limit — see REQUEST_PACING.
-            tokio::time::sleep(crate::scraper::daily_dictation::REQUEST_PACING).await;
-
-            let lesson = match crate::scraper::daily_dictation::fetch_exercise(&client, &url).await {
-                Ok(Some(lesson)) => lesson,
-                // No downloadable audio (YouTube-embedded categories) or a fetch/parse
-                // failure: skip, not an error — matches VOA ingestion's original skip policy.
-                Ok(None) | Err(_) => continue,
-            };
-
-            if existing_ids.contains(&lesson.id) {
-                continue;
-            }
-
-            sqlx::query(
-                "INSERT INTO lessons (id, title, level, category, audio_url, page_url, published_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(&lesson.id)
-            .bind(&lesson.title)
-            .bind(category.level)
-            .bind(category.slug)
-            .bind(&lesson.audio_url)
-            .bind(&lesson.page_url)
-            .bind(chrono::Utc::now().to_rfc3339())
-            .execute(pool.inner())
-            .await?;
-
-            for segment in &lesson.segments {
-                sqlx::query(
-                    "INSERT INTO segments (lesson_id, position, content, time_start, time_end)
-                     VALUES (?, ?, ?, ?, ?)",
-                )
-                .bind(&lesson.id)
-                .bind(segment.position)
-                .bind(&segment.content)
-                .bind(segment.time_start)
-                .bind(segment.time_end)
-                .execute(pool.inner())
-                .await?;
-            }
-
-            new_count += 1;
+            // Best-effort: a dropped progress event shouldn't abort the refresh.
+            let _ = app.emit(
+                "lessons-refresh-progress",
+                RefreshProgress { processed, total, new_count, category: category.slug },
+            );
         }
     }
 

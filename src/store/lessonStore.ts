@@ -1,6 +1,7 @@
+import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import * as tauriService from "../services/tauri";
-import type { CefrLevel, Lesson } from "../types/lesson";
+import type { CefrLevel, Lesson, RefreshProgress } from "../types/lesson";
 import type { Segment } from "../types/segment";
 import { errorMessage } from "../utils/error";
 
@@ -9,6 +10,7 @@ interface LessonStore {
   levelFilter: CefrLevel | "ALL";
   isLoading: boolean;
   error: string | null;
+  refreshProgress: RefreshProgress | null;
   segmentsByLesson: Record<string, Segment[]>;
   setLevelFilter: (level: CefrLevel | "ALL") => void;
   loadLessons: () => Promise<void>;
@@ -25,6 +27,7 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
   levelFilter: "ALL",
   isLoading: false,
   error: null,
+  refreshProgress: null,
   segmentsByLesson: {},
 
   setLevelFilter: (level) => set({ levelFilter: level }),
@@ -42,16 +45,21 @@ export const useLessonStore = create<LessonStore>((set, get) => ({
   },
 
   refreshLessons: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, refreshProgress: null });
+    const unlisten = await listen<RefreshProgress>("lessons-refresh-progress", (event) => {
+      set({ refreshProgress: event.payload });
+    });
     try {
       const result = await tauriService.fetchNewLessons();
       const lessons = await tauriService.listLessons();
-      set({ lessons, isLoading: false });
+      set({ lessons, isLoading: false, refreshProgress: null });
       return result.new;
     } catch (err) {
       console.error("refreshLessons failed", err);
-      set({ error: errorMessage(err), isLoading: false });
+      set({ error: errorMessage(err), isLoading: false, refreshProgress: null });
       throw err;
+    } finally {
+      unlisten();
     }
   },
 

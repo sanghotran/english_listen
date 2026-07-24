@@ -10,3 +10,13 @@ export interface Lesson {
   pageUrl: string;
   publishedAt: string;
 }
+
+/** Emitted by the Rust `fetch_new_lessons` command (event `lessons-refresh-progress`) while a
+ * refresh is in flight — a full first run walks 1000+ pages at a paced rate and can take
+ * several minutes, so the frontend needs live progress rather than one final result. */
+export interface RefreshProgress {
+  processed: number;
+  total: number;
+  newCount: number;
+  category: string;
+}
